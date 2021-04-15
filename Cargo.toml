@@ -7,14 +7,15 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cw0 = { path = "../cosmwasm-plus/packages/cw0", version = "0.6.0-alpha3" }
-cw2 = { path = "../cosmwasm-plus/packages/cw2", version = "0.6.0-alpha3" }
-cw1155 = { path = "../cosmwasm-plus/packages/cw1155", version = "0.6.0-alpha3" }
-cw-storage-plus = { path = "../cosmwasm-plus/packages/storage-plus", version = "0.6.0-alpha3" , features = ["iterator"]}
-cosmwasm-std = { version = "0.14.0-beta1", features = ["iterator"] }
-schemars = "0.7"
+cw0 = { path = "../cosmwasm-plus/packages/cw0", version = "0.6.0-beta1" }
+cw2 = { path = "../cosmwasm-plus/packages/cw2", version = "0.6.0-beta1" }
+cw1155 = { path = "../cosmwasm-plus/packages/cw1155", version = "0.6.0-beta1" }
+cw-storage-plus = { path = "../cosmwasm-plus/packages/storage-plus", version = "0.6.0-beta1" , features = ["iterator"]}
+cosmwasm-std = { version = "0.14.0-beta3", features = ["iterator"] }
+schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.20" }
+chrono = "0.4"
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.14.0-alpha2" }
+cosmwasm-schema = { version = "0.14.0-beta3" }
