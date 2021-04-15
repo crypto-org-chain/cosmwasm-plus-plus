@@ -16,7 +16,6 @@ pub struct CronCompiled {
 impl CronCompiled {
     /// Verify the datetime matches cron spec
     pub fn verify(&self, datetime: NaiveDateTime) -> bool {
-        println!("veirfy: {}", datetime);
         let time = datetime.time();
         let date = datetime.date();
         // SAFETY: guarantee of trait chrono::Timelike
@@ -59,5 +58,17 @@ mod tests {
         let cron = CronSpec::from_str("0 0 29 2 1").unwrap().compile().unwrap();
         assert!(cron.verify(NaiveDate::from_ymd(2016, 2, 29).and_hms(0, 0, 0)));
         assert!(!cron.verify(NaiveDate::from_ymd(2020, 2, 29).and_hms(0, 0, 0)));
+
+        let cron = CronSpec::from_str("*/2,*/3 0-10/3 * * *")
+            .unwrap()
+            .compile()
+            .unwrap();
+        assert!(cron.verify(NaiveDate::from_ymd(2016, 2, 29).and_hms(0, 0, 0)));
+        assert!(!cron.verify(NaiveDate::from_ymd(2016, 2, 29).and_hms(0, 1, 0)));
+        assert!(cron.verify(NaiveDate::from_ymd(2016, 2, 29).and_hms(0, 2, 0)));
+        assert!(cron.verify(NaiveDate::from_ymd(2016, 2, 29).and_hms(0, 3, 0)));
+        assert!(cron.verify(NaiveDate::from_ymd(2016, 2, 29).and_hms(0, 4, 0)));
+        assert!(!cron.verify(NaiveDate::from_ymd(2016, 2, 29).and_hms(0, 5, 0)));
+        assert!(!cron.verify(NaiveDate::from_ymd(2016, 2, 29).and_hms(1, 0, 0)));
     }
 }

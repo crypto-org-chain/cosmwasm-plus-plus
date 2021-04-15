@@ -38,11 +38,6 @@ impl BitSet {
         set
     }
 
-    #[inline]
-    pub fn full() -> Self {
-        Self(Num::MAX)
-    }
-
     pub fn set(&mut self, i: BitSetIndex) {
         self.0 |= 1 << i.value();
     }
