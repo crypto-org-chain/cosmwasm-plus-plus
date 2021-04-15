@@ -1,16 +1,26 @@
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::{Addr, Coin, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::cron::CronCompiled;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct InitMsg {}
+pub struct Params {
+    /// Minimal native tokens need to deposit for each plan, will refunded after deleted
+    pub minimal_deposit_plan: Coin,
+    /// Minimal native tokens need to deposit for each subscription, will refunded after deleted
+    pub minimal_deposit_subscription: Coin,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct InitMsg {
+    pub params: Params,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub enum ExecuteMsg {
     /// create plan, sender will be the plan owner
-    CreatePlan(Plan),
+    CreatePlan(PlanContent),
     /// stop plan, sender must be the plan owner
     StopPlan { plan_id: Uint128 },
     /// sender subscribe to some plan
@@ -24,7 +34,7 @@ pub enum ExecuteMsg {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct Plan {
+pub struct PlanContent {
     pub title: String,
     pub description: String,
     /// cw20 token address

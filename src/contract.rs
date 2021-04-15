@@ -4,14 +4,16 @@ use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult}
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InitMsg};
 use crate::query::QueryMsg;
+use crate::state::PARAMS;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
-    _deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    _msg: InitMsg,
+    msg: InitMsg,
 ) -> StdResult<Response> {
+    PARAMS.save(deps.storage, &msg.params)?;
     Ok(Response::default())
 }
 

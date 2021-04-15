@@ -1,2 +1,1 @@
-pub enum QueryMsg {
-}
+pub enum QueryMsg {}

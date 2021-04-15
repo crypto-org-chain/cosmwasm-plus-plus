@@ -1,27 +1,75 @@
-use cosmwasm_std::{Addr, Coin, Uint128};
-use cw1155::Expiration;
-use cw_storage_plus::{Item, Map};
+use cosmwasm_std::{Addr, Coin, StdResult, Storage, Uint128};
+use cw_storage_plus::{Item, Map, U128Key};
+use serde::{Deserialize, Serialize};
+
+use crate::msg::{Params, PlanContent};
 
 /// Store the self-incremental unique ids for plans and subscriptions
 pub const PLAN_ID: Item<Uint128> = Item::new("planid");
 pub const SUBSCRIPTION_ID: Item<Uint128> = Item::new("subid");
+/// Store contract params
+pub const PARAMS: Item<Params> = Item::new("params");
 
-/// Store the plans indexed by id
-pub const PLANS: Map<Uint128, Plan> = Map::new("balances");
-/// Store the approval status, `(owner, spender) -> expiration`
-pub const APPROVES: Map<(&Addr, &Addr), Expiration> = Map::new("approves");
-/// Store the tokens metadata url, also supports enumerating tokens,
-/// An entry for token_id must exist as long as there's tokens in circulation.
-pub const TOKENS: Map<&str, String> = Map::new("tokens");
+/// Store the plans indexed by plan-id
+/// plan-id -> Plan
+pub const PLANS: Map<U128Key, Plan> = Map::new("plans");
+/// Store the subscriptions indexed by subscription-id
+/// subscription-id -> Subscription
+pub const SUBSCRIPTIONS: Map<U128Key, Subscription> = Map::new("subs");
 
+/// Subscriptions indexed by plan-id for enumeration
+/// (plan-id, subscription-id) -> ()
+pub const PLAN_SUBS: Map<(Uint128, Uint128), ()> = Map::new("plan-subs");
+// /// Subscription queue ordered by expiration time
+// /// (expiration-time, subscription-id) -> ()
+// pub const Q_EXPIRATION: Map<(i64, Uint128), ()> = Map::new("subs-expiration");
+/// Subscription queue ordered by next_collection_time
+/// (next-collection-time, subscription-id) -> ()
+pub const Q_COLLECTION: Map<(i64, Uint128), ()> = Map::new("subs-collection");
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Plan {
-    plan_id: Uint128,
+    id: Uint128,
     owner: Addr,
-    title: String,
-    description: String,
-    // FIXME do we need to support multiple coins here?
-    price: Coin,
-    duration_secs: u32,
-    cron_spec: CronSpec,
-    tzoffset: i32,
+    content: PlanContent,
+    deposit: Coin,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Subscription {
+    id: Uint128,
+    plan_id: Uint128,
+    subscriber: Addr,
+    expiration_time: i64,
+    last_collection_time: i64,
+    next_collection_time: i64,
+    deposit: Coin,
+}
+
+pub fn gen_plan_id(store: &mut dyn Storage) -> StdResult<Uint128> {
+    let mut plan_id = PLAN_ID.may_load(store)?.unwrap_or(0u64.into());
+    plan_id = plan_id.wrapping_add(1u64.into());
+    // ensure id not used
+    while store
+        .get(&PLANS.key(U128Key::from(plan_id.u128())))
+        .is_some()
+    {
+        plan_id = plan_id.wrapping_add(1u64.into());
+    }
+    PLAN_ID.save(store, &plan_id)?;
+    Ok(plan_id)
+}
+
+pub fn gen_subscription_id(store: &mut dyn Storage) -> StdResult<Uint128> {
+    let mut subscription_id = SUBSCRIPTION_ID.may_load(store)?.unwrap_or(0u64.into());
+    subscription_id = subscription_id.wrapping_add(1u64.into());
+    // ensure id not used
+    while store
+        .get(&SUBSCRIPTIONS.key(U128Key::from(subscription_id.u128())))
+        .is_some()
+    {
+        subscription_id = subscription_id.wrapping_add(1u64.into());
+    }
+    PLAN_ID.save(store, &subscription_id)?;
+    Ok(subscription_id)
 }
