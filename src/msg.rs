@@ -41,6 +41,11 @@ pub enum ExecuteMsg {
         plan_id: Uint128,
         subscriber: String,
     },
+    /// Update expires of subscription
+    UpdateExpires {
+        plan_id: Uint128,
+        expires: Expiration,
+    },
     /// Trigger collection of a batch of subscriptions
     Collection { items: Vec<CollectOne> },
 }

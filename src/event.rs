@@ -27,6 +27,19 @@ impl<'a> Event for UnsubscribeEvent<'a> {
     }
 }
 
+pub struct UpdateSubscriptionEvent<'a> {
+    pub plan_id: Uint128,
+    pub subscriber: &'a str,
+}
+
+impl<'a> Event for UpdateSubscriptionEvent<'a> {
+    fn add_attributes(&self, rsp: &mut Response) {
+        rsp.add_attribute("action", "update-subscription");
+        rsp.add_attribute("plan_id", self.plan_id);
+        rsp.add_attribute("subscriber", self.subscriber);
+    }
+}
+
 pub struct CreatePlanEvent {
     pub plan_id: Uint128,
 }

@@ -8,7 +8,9 @@ use cw20::Cw20ExecuteMsg;
 use cw_storage_plus::U128Key;
 
 use crate::error::ContractError;
-use crate::event::{CreatePlanEvent, StopPlanEvent, SubscribeEvent, UnsubscribeEvent};
+use crate::event::{
+    CreatePlanEvent, StopPlanEvent, SubscribeEvent, UnsubscribeEvent, UpdateSubscriptionEvent,
+};
 use crate::msg::{CollectOne, ExecuteMsg, InitMsg, PlanContent};
 use crate::query::QueryMsg;
 use crate::state::{
@@ -47,6 +49,9 @@ pub fn execute(
             plan_id,
             subscriber,
         } => execute_unsubscribe_user(deps, info, plan_id, subscriber),
+        ExecuteMsg::UpdateExpires { plan_id, expires } => {
+            execute_update_expires(deps, env, info, plan_id, expires)
+        }
         ExecuteMsg::Collection { items } => execute_collection(deps, items),
     }
 }
@@ -226,6 +231,30 @@ fn execute_unsubscribe_user(
 
     let refund_msg = unsubscribe(deps.storage, plan_id, subscriber)?;
     rsp.messages.push(refund_msg);
+    Ok(rsp)
+}
+
+fn execute_update_expires(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    plan_id: Uint128,
+    expires: Expiration,
+) -> Result<Response, ContractError> {
+    if expires.is_expired(&env.block) {
+        return Err(ContractError::InvalidExpires);
+    }
+    let key = SUBSCRIPTIONS.key((plan_id.u128().into(), info.sender.as_str()));
+    let mut subscription = key.load(deps.storage)?;
+    subscription.expires = expires;
+    key.save(deps.storage, &subscription)?;
+
+    let mut rsp = Response::default();
+    UpdateSubscriptionEvent {
+        plan_id,
+        subscriber: info.sender.as_str(),
+    }
+    .add_attributes(&mut rsp);
     Ok(rsp)
 }
 
