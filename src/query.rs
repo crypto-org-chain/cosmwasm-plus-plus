@@ -19,11 +19,15 @@ pub enum QueryMsg {
         plan_id: Uint128,
         subscriber: String,
     },
+    /// List subscriptions, support pagination
     ListSubscriptions {
         plan_id: Uint128,
         start_after: Option<String>,
         limit: Option<u32>,
     },
+    // TODO List all subscriptions of user
+    // ListSubscriptionsOfUser {
+    // },
     /// List collectible subscriptions, response type is SubscriptionsResponse
     CollectibleSubscriptions { limit: Option<u32> },
 }
