@@ -62,11 +62,14 @@ pub fn gen_plan_id(store: &mut dyn Storage) -> StdResult<Uint128> {
 pub fn iter_subscriptions_by_plan<'a>(
     store: &'a dyn Storage,
     plan_id: Uint128,
-) -> impl Iterator<Item = StdResult<(Addr, Subscription)>> + 'a {
+) -> impl Iterator<Item = (Addr, Subscription)> + 'a {
     SUBSCRIPTIONS
         .prefix(plan_id.u128().into())
         .range(store, None, None, Order::Ascending)
-        .map(|mpair| mpair.map(|(k, v)| (Addr::unchecked(String::from_utf8(k).unwrap()), v)))
+        .map(|mpair| {
+            let (k, v) = mpair.unwrap();
+            (Addr::unchecked(String::from_utf8(k).unwrap()), v)
+        })
 }
 
 /// PANIC: if deserialization failed caused by corrupted storage
