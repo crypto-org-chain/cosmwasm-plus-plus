@@ -159,8 +159,8 @@ dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
  "cw0",
- "cw1155",
  "cw2",
+ "cw20",
  "schemars",
  "serde",
  "thiserror",
@@ -177,21 +177,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw1155"
-version = "0.6.0-beta1"
-dependencies = [
- "cosmwasm-std",
- "cw0",
- "schemars",
- "serde",
-]
-
-[[package]]
 name = "cw2"
 version = "0.6.0-beta1"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
+ "schemars",
+ "serde",
+]
+
+[[package]]
+name = "cw20"
+version = "0.6.0-beta1"
+dependencies = [
+ "cosmwasm-std",
+ "cw0",
  "schemars",
  "serde",
 ]

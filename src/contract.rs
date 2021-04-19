@@ -1,10 +1,16 @@
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    has_coins, to_binary, Addr, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, Storage, Uint128, WasmMsg,
+};
+use cw0::Expiration;
+use cw20::Cw20ExecuteMsg;
+use cw_storage_plus::U128Key;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InitMsg};
+use crate::msg::{CollectOne, ExecuteMsg, InitMsg, PlanContent};
 use crate::query::QueryMsg;
-use crate::state::PARAMS;
+use crate::state::{gen_plan_id, Plan, Subscription, PARAMS, PLANS, Q_COLLECTION, SUBSCRIPTIONS};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -24,7 +30,206 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    match msg {
+        ExecuteMsg::CreatePlan(content) => execute_create_plan(deps, info, content),
+        ExecuteMsg::StopPlan { plan_id } => execute_stop_plan(deps, info, plan_id),
+        ExecuteMsg::Subscribe {
+            plan_id,
+            expires,
+            next_collection_time,
+        } => execute_subscribe(deps, info, env, plan_id, expires, next_collection_time),
+        ExecuteMsg::Unsubscribe { plan_id } => execute_unsubscribe(deps, info, plan_id),
+        ExecuteMsg::UnsubscribeUser {
+            plan_id,
+            subscriber,
+        } => execute_unsubscribe_user(deps, info, plan_id, subscriber),
+        ExecuteMsg::Collection { items } => execute_collection(deps, items),
+    }
+}
+
+fn execute_create_plan(
+    deps: DepsMut,
+    info: MessageInfo,
+    content: PlanContent,
+) -> Result<Response, ContractError> {
+    content.validate()?;
+
+    let params = PARAMS.load(deps.storage)?;
+    let id = gen_plan_id(deps.storage)?;
+    for required in params.required_deposit_plan.iter() {
+        if !has_coins(&info.funds, required) {
+            return Err(ContractError::NotEnoughDeposit);
+        }
+    }
+    let plan = Plan {
+        id,
+        owner: info.sender,
+        content,
+        deposit: info.funds,
+    };
+    PLANS.save(deps.storage, id.u128().into(), &plan)?;
+
+    // TODO events
     Ok(Response::default())
+}
+
+fn execute_stop_plan(
+    deps: DepsMut,
+    info: MessageInfo,
+    plan_id: Uint128,
+) -> Result<Response, ContractError> {
+    // TODO Stop all subscriptions
+    // TODO Delete plan
+
+    // TODO events
+    Ok(Response::default())
+}
+
+fn execute_subscribe(
+    deps: DepsMut,
+    info: MessageInfo,
+    env: Env,
+    plan_id: Uint128,
+    expires: Expiration,
+    next_collection_time: i64,
+) -> Result<Response, ContractError> {
+    // verify expires is valid
+    if expires.is_expired(&env.block) {
+        return Err(ContractError::InvalidExpires);
+    }
+
+    // verify subscription not exists
+    let key = (plan_id.u128().into(), info.sender.as_str());
+    let subkey = SUBSCRIPTIONS.key(key.clone());
+    if deps.storage.get(&subkey).is_some() {
+        return Err(ContractError::SubscriptionExists);
+    }
+
+    // verify deposit is enough
+    let params = PARAMS.load(deps.storage)?;
+    for required in params.required_deposit_subscription.iter() {
+        if !has_coins(&info.funds, required) {
+            return Err(ContractError::NotEnoughDeposit);
+        }
+    }
+
+    // verify next_collection_time
+    let plan = PLANS.load(deps.storage, plan_id.u128().into())?;
+    plan.content.verify_timestamp(next_collection_time);
+
+    // insert new subscription
+    let sub = Subscription {
+        expires,
+        last_collection_time: None,
+        next_collection_time,
+        deposit: info.funds,
+    };
+    subkey.save(deps.storage, &sub)?;
+    Q_COLLECTION.save(deps.storage, (next_collection_time.into(), key), &())?;
+
+    // TODO events
+    Ok(Response::default())
+}
+
+fn unsubscribe(
+    storage: &mut dyn Storage,
+    plan_id: Uint128,
+    subscriber: Addr,
+) -> StdResult<Vec<Coin>> {
+    // delete subscription
+    let key = (U128Key::from(plan_id.u128()), subscriber.as_str());
+    let sub = SUBSCRIPTIONS.load(storage, key.clone())?;
+    SUBSCRIPTIONS.remove(storage, key.clone());
+    // delete in queue
+    Q_COLLECTION.remove(storage, (sub.next_collection_time.into(), key));
+
+    Ok(sub.deposit)
+}
+
+fn execute_unsubscribe(
+    deps: DepsMut,
+    info: MessageInfo,
+    plan_id: Uint128,
+) -> Result<Response, ContractError> {
+    let _ = unsubscribe(deps.storage, plan_id, info.sender)?;
+
+    // TODO events, refund
+    Ok(Response::default())
+}
+
+fn execute_unsubscribe_user(
+    deps: DepsMut,
+    info: MessageInfo,
+    plan_id: Uint128,
+    subscriber: String,
+) -> Result<Response, ContractError> {
+    let subscriber = deps.api.addr_validate(&subscriber)?;
+    // load and plan, verify info.sender is plan owner
+    let plan = PLANS.load(deps.storage, plan_id.u128().into())?;
+    if plan.owner != info.sender {
+        return Err(ContractError::NotPlanOwner);
+    }
+    let _ = unsubscribe(deps.storage, plan_id, subscriber)?;
+
+    // TODO events, refund
+    Ok(Response::default())
+}
+
+fn execute_collection(deps: DepsMut, items: Vec<CollectOne>) -> Result<Response, ContractError> {
+    let mut rsp = Response::default();
+    for item in items.iter() {
+        if item.next_collection_time <= item.current_collection_time {
+            // TODO handle failure
+            continue;
+        }
+        let subscriber = deps.api.addr_validate(&item.subscriber)?;
+
+        // load plan and subscription
+        let plan = PLANS.load(deps.storage, item.plan_id.u128().into())?;
+        let key = (item.plan_id.u128().into(), subscriber.as_str());
+        let mut subscription = SUBSCRIPTIONS.load(deps.storage, key.clone())?;
+        if let Some(last_collection_time) = subscription.last_collection_time {
+            if item.current_collection_time <= last_collection_time {
+                // TODO handle failure
+                continue;
+            }
+        }
+        // verify collection time match cron spec
+        if !plan.content.verify_timestamp(item.current_collection_time)
+            || !plan.content.verify_timestamp(item.next_collection_time)
+        {
+            // TODO handle failure
+            continue;
+        }
+
+        // do cw20 transfer
+        // TODO handle transfer failure with submessage callback
+        rsp.messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: plan.content.token.into(),
+            msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
+                owner: subscriber.clone().into(),
+                recipient: plan.owner.into(),
+                amount: plan.content.amount,
+            })?,
+            send: vec![],
+        }));
+
+        // update next_collection_time
+        subscription.last_collection_time = Some(item.current_collection_time);
+        Q_COLLECTION.remove(
+            deps.storage,
+            (subscription.next_collection_time.into(), key.clone()),
+        );
+        subscription.next_collection_time = item.next_collection_time;
+        Q_COLLECTION.save(
+            deps.storage,
+            (subscription.next_collection_time.into(), key.clone()),
+            &(),
+        )?;
+        SUBSCRIPTIONS.save(deps.storage, key, &subscription)?;
+    }
+
+    Ok(rsp)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

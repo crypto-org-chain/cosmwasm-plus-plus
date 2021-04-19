@@ -38,7 +38,6 @@ pub enum CronError {
     OutOfRange,
 }
 
-/// Empty Vec means `*`
 #[derive(Clone, PartialEq, Debug)]
 pub struct CronSpec {
     pub minute: Vec<CronItem>,
