@@ -1,10 +1,11 @@
 use std::convert::TryInto;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{from_slice, Addr, Coin, Order, StdResult, Storage, Uint128};
 use cw0::Expiration;
-use cw_storage_plus::{I64Key, Item, Map, PrimaryKey, U128Key};
+use cw_storage_plus::{Bound, I64Key, Item, Map, PrimaryKey, U128Key};
 
 use crate::msg::{Params, PlanContent};
 
@@ -28,7 +29,7 @@ pub const SUBSCRIPTIONS: Map<SubscriptionKey, Subscription> = Map::new("plan-sub
 /// (next-collection-time, plan-id, subscriber) -> ()
 pub const Q_COLLECTION: Map<(I64Key, SubscriptionKey), ()> = Map::new("subs-collection");
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
     pub id: Uint128,
     pub owner: Addr,
@@ -36,7 +37,7 @@ pub struct Plan {
     pub deposit: Vec<Coin>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Subscription {
     pub expires: Expiration,
     pub last_collection_time: Option<i64>,
@@ -62,10 +63,12 @@ pub fn gen_plan_id(store: &mut dyn Storage) -> StdResult<Uint128> {
 pub fn iter_subscriptions_by_plan<'a>(
     store: &'a dyn Storage,
     plan_id: Uint128,
+    start_after: Option<Addr>,
 ) -> impl Iterator<Item = (Addr, Subscription)> + 'a {
+    let start = start_after.map(|addr| Bound::exclusive(addr.as_ref()));
     SUBSCRIPTIONS
         .prefix(plan_id.u128().into())
-        .range(store, None, None, Order::Ascending)
+        .range(store, start, None, Order::Ascending)
         .map(|mpair| {
             let (k, v) = mpair.unwrap();
             (Addr::unchecked(String::from_utf8(k).unwrap()), v)

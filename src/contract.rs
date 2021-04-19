@@ -1,22 +1,27 @@
+use std::convert::TryInto;
+
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    has_coins, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    has_coins, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw0::{Event, Expiration};
 use cw20::Cw20ExecuteMsg;
-use cw_storage_plus::U128Key;
+use cw_storage_plus::{Bound, U128Key};
 
 use crate::error::ContractError;
 use crate::event::{
     CreatePlanEvent, StopPlanEvent, SubscribeEvent, UnsubscribeEvent, UpdateSubscriptionEvent,
 };
 use crate::msg::{CollectOne, ExecuteMsg, InitMsg, PlanContent};
-use crate::query::QueryMsg;
+use crate::query::{PlansResponse, QueryMsg, SubscriptionsResponse};
 use crate::state::{
-    gen_plan_id, iter_subscriptions_by_plan, Plan, Subscription, PARAMS, PLANS, Q_COLLECTION,
-    SUBSCRIPTIONS,
+    gen_plan_id, iter_collectible_subscriptions, iter_subscriptions_by_plan, Plan, Subscription,
+    PARAMS, PLANS, Q_COLLECTION, SUBSCRIPTIONS,
 };
+
+const DEFAULT_LIMIT: u32 = 10;
+const MAX_LIMIT: u32 = 30;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -96,7 +101,7 @@ fn execute_stop_plan(
     let mut rsp = Response::default();
 
     // Stop all subscriptions
-    let subscriptions: Vec<_> = iter_subscriptions_by_plan(deps.storage, plan_id).collect();
+    let subscriptions: Vec<_> = iter_subscriptions_by_plan(deps.storage, plan_id, None).collect();
     for (subscriber, sub) in subscriptions.into_iter() {
         UnsubscribeEvent {
             plan_id,
@@ -317,5 +322,55 @@ fn execute_collection(deps: DepsMut, items: Vec<CollectOne>) -> Result<Response,
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    Ok(Binary::default())
+    match msg {
+        QueryMsg::Plan { plan_id } => to_binary(&PLANS.load(deps.storage, plan_id.u128().into())?),
+        QueryMsg::Subscription {
+            plan_id,
+            subscriber,
+        } => to_binary(&SUBSCRIPTIONS.load(deps.storage, (plan_id.u128().into(), &subscriber))?),
+        QueryMsg::ListSubscriptions {
+            plan_id,
+            start_after,
+            limit,
+        } => query_subscriptions(deps, plan_id, start_after, limit),
+        QueryMsg::ListPlans { start_after, limit } => query_plans(deps, start_after, limit),
+        QueryMsg::CollectibleSubscriptions { limit } => {
+            query_collectible_subscriptions(deps, env, limit)
+        }
+    }
+}
+
+fn query_plans(deps: Deps, start_after: Option<Uint128>, limit: Option<u32>) -> StdResult<Binary> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start_after = start_after.map(|id| Bound::Exclusive(U128Key::from(id.u128()).into()));
+    let plans = PLANS
+        .range(deps.storage, start_after, None, Order::Ascending)
+        .map(|mpair| mpair.unwrap().1)
+        .take(limit)
+        .collect();
+    to_binary(&PlansResponse { plans })
+}
+
+fn query_subscriptions(
+    deps: Deps,
+    plan_id: Uint128,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<Binary> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start_after = start_after.map(|addr| deps.api.addr_validate(&addr).unwrap());
+    let subscriptions = iter_subscriptions_by_plan(deps.storage, plan_id, start_after)
+        .map(|(subscriber, sub)| (plan_id, subscriber, sub))
+        .take(limit)
+        .collect();
+    to_binary(&SubscriptionsResponse { subscriptions })
+}
+
+fn query_collectible_subscriptions(deps: Deps, env: Env, limit: Option<u32>) -> StdResult<Binary> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let subscriptions =
+        iter_collectible_subscriptions(deps.storage, env.block.time.try_into().unwrap())
+            .take(limit)
+            .collect();
+    to_binary(&SubscriptionsResponse { subscriptions })
 }
