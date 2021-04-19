@@ -4,6 +4,7 @@ pub mod contract;
 pub mod bitset;
 pub mod cron;
 mod error;
+mod event;
 mod msg;
 mod query;
 mod state;

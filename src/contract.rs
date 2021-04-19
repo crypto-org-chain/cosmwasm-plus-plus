@@ -3,11 +3,12 @@ use cosmwasm_std::{
     has_coins, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
     Response, StdResult, Storage, Uint128, WasmMsg,
 };
-use cw0::Expiration;
+use cw0::{Event, Expiration};
 use cw20::Cw20ExecuteMsg;
 use cw_storage_plus::U128Key;
 
 use crate::error::ContractError;
+use crate::event::{CreatePlanEvent, StopPlanEvent, SubscribeEvent, UnsubscribeEvent};
 use crate::msg::{CollectOne, ExecuteMsg, InitMsg, PlanContent};
 use crate::query::QueryMsg;
 use crate::state::{
@@ -72,8 +73,9 @@ fn execute_create_plan(
     };
     PLANS.save(deps.storage, id.u128().into(), &plan)?;
 
-    // TODO events
-    Ok(Response::default())
+    let mut rsp = Response::default();
+    CreatePlanEvent { plan_id: id }.add_attributes(&mut rsp);
+    Ok(rsp)
 }
 
 fn execute_stop_plan(
@@ -86,15 +88,22 @@ fn execute_stop_plan(
         return Err(ContractError::NotPlanOwner);
     }
 
+    let mut rsp = Response::default();
+
     // Stop all subscriptions
-    let mut refund_msgs = Vec::new();
     let subscriptions: Vec<_> = iter_subscriptions_by_plan(deps.storage, plan_id).collect();
     for (subscriber, sub) in subscriptions.into_iter() {
+        UnsubscribeEvent {
+            plan_id,
+            subscriber: subscriber.as_str(),
+        }
+        .add_attributes(&mut rsp);
+
         let key = (plan_id.u128().into(), subscriber.as_str());
         SUBSCRIPTIONS.remove(deps.storage, key.clone());
         // delete in queue
         Q_COLLECTION.remove(deps.storage, (sub.next_collection_time.into(), key));
-        refund_msgs.push(CosmosMsg::Bank(BankMsg::Send {
+        rsp.messages.push(CosmosMsg::Bank(BankMsg::Send {
             to_address: subscriber.into(),
             amount: sub.deposit,
         }));
@@ -102,14 +111,11 @@ fn execute_stop_plan(
 
     // Delete plan
     PLANS.remove(deps.storage, plan_id.u128().into());
-    refund_msgs.push(CosmosMsg::Bank(BankMsg::Send {
+    rsp.messages.push(CosmosMsg::Bank(BankMsg::Send {
         to_address: plan.owner.into(),
         amount: plan.deposit,
     }));
-
-    let mut rsp = Response::default();
-    rsp.messages = refund_msgs;
-    // TODO events
+    StopPlanEvent { plan_id: plan.id }.add_attributes(&mut rsp);
     Ok(rsp)
 }
 
@@ -155,8 +161,13 @@ fn execute_subscribe(
     subkey.save(deps.storage, &sub)?;
     Q_COLLECTION.save(deps.storage, (next_collection_time.into(), key), &())?;
 
-    // TODO events
-    Ok(Response::default())
+    let mut rsp = Response::default();
+    SubscribeEvent {
+        plan_id,
+        subscriber: info.sender.as_str(),
+    }
+    .add_attributes(&mut rsp);
+    Ok(rsp)
 }
 
 fn unsubscribe(
@@ -181,10 +192,15 @@ fn execute_unsubscribe(
     info: MessageInfo,
     plan_id: Uint128,
 ) -> Result<Response, ContractError> {
-    let refund_msg = unsubscribe(deps.storage, plan_id, info.sender)?;
     let mut rsp = Response::default();
+    UnsubscribeEvent {
+        plan_id,
+        subscriber: info.sender.as_str(),
+    }
+    .add_attributes(&mut rsp);
+
+    let refund_msg = unsubscribe(deps.storage, plan_id, info.sender)?;
     rsp.messages.push(refund_msg);
-    // TODO events
     Ok(rsp)
 }
 
@@ -200,10 +216,16 @@ fn execute_unsubscribe_user(
     if plan.owner != info.sender {
         return Err(ContractError::NotPlanOwner);
     }
-    let refund_msg = unsubscribe(deps.storage, plan_id, subscriber)?;
+
     let mut rsp = Response::default();
+    UnsubscribeEvent {
+        plan_id,
+        subscriber: subscriber.as_str(),
+    }
+    .add_attributes(&mut rsp);
+
+    let refund_msg = unsubscribe(deps.storage, plan_id, subscriber)?;
     rsp.messages.push(refund_msg);
-    // TODO events
     Ok(rsp)
 }
 
