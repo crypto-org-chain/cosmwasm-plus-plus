@@ -93,6 +93,18 @@ impl BitSet {
         63u8.checked_sub(self.0.leading_zeros() as u8)
             .map(BitSetIndex)
     }
+
+    /// Returns the next bit set from the specified index,
+    /// including possibly the current index
+    pub fn next_set(self, i: BitSetIndex) -> Option<BitSetIndex> {
+        let n = self.0 >> i.0;
+        if n != 0 {
+            // SAFETY: the add result never exceed 64
+            Some(BitSetIndex(i.0 + n.trailing_zeros() as u8))
+        } else {
+            None
+        }
+    }
 }
 
 /// An u8 which is ensured to be smaller than 64 by construction
@@ -111,7 +123,10 @@ impl BitSetIndex {
         }
     }
 
-    pub fn unsafe_new(u: u8) -> Self {
+    pub const fn unsafe_new(u: u8) -> Self {
+        if u as usize >= NUM_SIZE {
+            panic!("out of range bitset index");
+        }
         Self(u)
     }
 
@@ -173,5 +188,19 @@ mod tests {
     }
 
     #[test]
-    fn bitset_iterator() {}
+    fn bitset_next_set() {
+        let mut set = BitSet::new();
+        set.set(BitSetIndex::unsafe_new(0));
+        set.set(BitSetIndex::unsafe_new(10));
+
+        assert_eq!(
+            set.next_set(BitSetIndex::unsafe_new(0)),
+            Some(BitSetIndex::unsafe_new(0))
+        );
+        assert_eq!(
+            set.next_set(BitSetIndex::unsafe_new(1)),
+            Some(BitSetIndex::unsafe_new(10))
+        );
+        assert_eq!(set.next_set(BitSetIndex::unsafe_new(11)), None);
+    }
 }

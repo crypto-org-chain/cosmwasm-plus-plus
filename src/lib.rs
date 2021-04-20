@@ -1,4 +1,4 @@
-#![feature(const_option)]
+#![feature(const_option, const_panic)]
 pub use crate::msg::{ExecuteMsg, InitMsg};
 pub use crate::query::{PlansResponse, QueryMsg, SubscriptionsResponse};
 pub use crate::state::{Plan, Subscription};
