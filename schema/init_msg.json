@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InitMsg",
+  "type": "object",
+  "required": [
+    "params"
+  ],
+  "properties": {
+    "params": {
+      "$ref": "#/definitions/Params"
+    }
+  },
+  "definitions": {
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
+    "Params": {
+      "type": "object",
+      "required": [
+        "required_deposit_plan",
+        "required_deposit_subscription"
+      ],
+      "properties": {
+        "required_deposit_plan": {
+          "description": "Minimal native tokens deposit need for each plan, will refunded after deleted",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Coin"
+          }
+        },
+        "required_deposit_subscription": {
+          "description": "Minimal native tokens deposit need for each subscription, will refunded after deleted",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Coin"
+          }
+        }
+      }
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

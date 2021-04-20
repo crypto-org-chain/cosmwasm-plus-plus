@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "anyOf": [
+    {
+      "description": "Query one plan, response type is Plan",
+      "type": "object",
+      "required": [
+        "plan"
+      ],
+      "properties": {
+        "plan": {
+          "type": "object",
+          "required": [
+            "plan_id"
+          ],
+          "properties": {
+            "plan_id": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "List plans, support pagination",
+      "type": "object",
+      "required": [
+        "list_plans"
+      ],
+      "properties": {
+        "list_plans": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Query one subscription, response type is Subscription",
+      "type": "object",
+      "required": [
+        "subscription"
+      ],
+      "properties": {
+        "subscription": {
+          "type": "object",
+          "required": [
+            "plan_id",
+            "subscriber"
+          ],
+          "properties": {
+            "plan_id": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "subscriber": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "List subscriptions, support pagination",
+      "type": "object",
+      "required": [
+        "list_subscriptions"
+      ],
+      "properties": {
+        "list_subscriptions": {
+          "type": "object",
+          "required": [
+            "plan_id"
+          ],
+          "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "plan_id": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "start_after": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "List collectible subscriptions, response type is SubscriptionsResponse",
+      "type": "object",
+      "required": [
+        "collectible_subscriptions"
+      ],
+      "properties": {
+        "collectible_subscriptions": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

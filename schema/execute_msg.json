@@ -1,0 +1,324 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecuteMsg",
+  "anyOf": [
+    {
+      "description": "create plan, sender will be the plan owner",
+      "type": "object",
+      "required": [
+        "CreatePlan"
+      ],
+      "properties": {
+        "CreatePlan": {
+          "$ref": "#/definitions/PlanContent_for_String"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "stop plan, sender must be the plan owner",
+      "type": "object",
+      "required": [
+        "StopPlan"
+      ],
+      "properties": {
+        "StopPlan": {
+          "type": "object",
+          "required": [
+            "plan_id"
+          ],
+          "properties": {
+            "plan_id": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "sender subscribe to some plan If expiration is set, update if subscription exists",
+      "type": "object",
+      "required": [
+        "Subscribe"
+      ],
+      "properties": {
+        "Subscribe": {
+          "type": "object",
+          "required": [
+            "expires",
+            "next_collection_time",
+            "plan_id"
+          ],
+          "properties": {
+            "expires": {
+              "$ref": "#/definitions/Expiration"
+            },
+            "next_collection_time": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "plan_id": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "sender unsubscribe to some plan",
+      "type": "object",
+      "required": [
+        "Unsubscribe"
+      ],
+      "properties": {
+        "Unsubscribe": {
+          "type": "object",
+          "required": [
+            "plan_id"
+          ],
+          "properties": {
+            "plan_id": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Stop subscription on user's behalf, sender must be the plan owner",
+      "type": "object",
+      "required": [
+        "UnsubscribeUser"
+      ],
+      "properties": {
+        "UnsubscribeUser": {
+          "type": "object",
+          "required": [
+            "plan_id",
+            "subscriber"
+          ],
+          "properties": {
+            "plan_id": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "subscriber": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Update expires of subscription",
+      "type": "object",
+      "required": [
+        "UpdateExpires"
+      ],
+      "properties": {
+        "UpdateExpires": {
+          "type": "object",
+          "required": [
+            "expires",
+            "plan_id"
+          ],
+          "properties": {
+            "expires": {
+              "$ref": "#/definitions/Expiration"
+            },
+            "plan_id": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Trigger collection of a batch of subscriptions",
+      "type": "object",
+      "required": [
+        "Collection"
+      ],
+      "properties": {
+        "Collection": {
+          "type": "object",
+          "required": [
+            "items"
+          ],
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CollectOne"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "CollectOne": {
+      "type": "object",
+      "required": [
+        "current_collection_time",
+        "next_collection_time",
+        "plan_id",
+        "subscriber"
+      ],
+      "properties": {
+        "current_collection_time": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "next_collection_time": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "plan_id": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "subscriber": {
+          "type": "string"
+        }
+      }
+    },
+    "CronCompiled": {
+      "type": "object",
+      "required": [
+        "hour",
+        "mday",
+        "minute",
+        "month",
+        "wday"
+      ],
+      "properties": {
+        "hour": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "mday": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "minute": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "month": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "wday": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Expiration": {
+      "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
+      "anyOf": [
+        {
+          "description": "AtHeight will expire when `env.block.height` >= height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "AtTime will expire when `env.block.time` >= time",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Never will never expire. Used to express the empty variant",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PlanContent_for_String": {
+      "type": "object",
+      "required": [
+        "amount",
+        "cron",
+        "description",
+        "title",
+        "token",
+        "tzoffset"
+      ],
+      "properties": {
+        "amount": {
+          "description": "Amount to be collected for each period",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "cron": {
+          "description": "Crontab like specification for the plan",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CronCompiled"
+            }
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "token": {
+          "description": "cw20 token address",
+          "type": "string"
+        },
+        "tzoffset": {
+          "description": "timezone for the crontab logic",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,2 @@
+- `cargo run --example schema` - update json schemas
+- `cargo run --example cron "* * * * *"` - compile crontab syntax to bitset format
