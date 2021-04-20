@@ -6,12 +6,10 @@ pub use crate::state::{Plan, Subscription};
 pub mod bitset;
 pub mod contract;
 pub mod cron;
+pub mod cron_spec;
 
 mod error;
 mod event;
 mod msg;
 mod query;
 mod state;
-
-#[cfg(any(test, feature = "off-chain"))]
-pub mod cron_spec;
