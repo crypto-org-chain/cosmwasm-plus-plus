@@ -64,9 +64,9 @@ pub fn execute(
 fn execute_create_plan(
     deps: DepsMut,
     info: MessageInfo,
-    content: PlanContent,
+    content: PlanContent<String>,
 ) -> Result<Response, ContractError> {
-    content.validate()?;
+    let content = content.validate(deps.api)?;
 
     let params = PARAMS.load(deps.storage)?;
     let id = gen_plan_id(deps.storage)?;

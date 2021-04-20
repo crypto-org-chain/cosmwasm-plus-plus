@@ -29,11 +29,13 @@ pub const SUBSCRIPTIONS: Map<SubscriptionKey, Subscription> = Map::new("plan-sub
 /// (next-collection-time, plan-id, subscriber) -> ()
 pub const Q_COLLECTION: Map<(I64Key, SubscriptionKey), ()> = Map::new("subs-collection");
 
+const ZERO: Uint128 = Uint128::zero();
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
     pub id: Uint128,
     pub owner: Addr,
-    pub content: PlanContent,
+    pub content: PlanContent<Addr>,
     pub deposit: Vec<Coin>,
 }
 
@@ -46,7 +48,7 @@ pub struct Subscription {
 }
 
 pub fn gen_plan_id(store: &mut dyn Storage) -> StdResult<Uint128> {
-    let mut plan_id = PLAN_ID.may_load(store)?.unwrap_or(0u64.into());
+    let mut plan_id = PLAN_ID.may_load(store)?.unwrap_or(ZERO);
     plan_id = plan_id.wrapping_add(1u64.into());
     // ensure id not used
     while store
@@ -60,11 +62,11 @@ pub fn gen_plan_id(store: &mut dyn Storage) -> StdResult<Uint128> {
 }
 
 /// PANIC: if deserialization failed caused by corrupted storage
-pub fn iter_subscriptions_by_plan<'a>(
-    store: &'a dyn Storage,
+pub fn iter_subscriptions_by_plan(
+    store: &dyn Storage,
     plan_id: Uint128,
     start_after: Option<Addr>,
-) -> impl Iterator<Item = (Addr, Subscription)> + 'a {
+) -> impl Iterator<Item = (Addr, Subscription)> + '_ {
     let start = start_after.map(|addr| Bound::exclusive(addr.as_ref()));
     SUBSCRIPTIONS
         .prefix(plan_id.u128().into())
@@ -76,10 +78,10 @@ pub fn iter_subscriptions_by_plan<'a>(
 }
 
 /// PANIC: if deserialization failed caused by corrupted storage
-pub fn iter_collectible_subscriptions<'a>(
-    store: &'a dyn Storage,
+pub fn iter_collectible_subscriptions(
+    store: &dyn Storage,
     now: i64,
-) -> impl Iterator<Item = (Uint128, Addr, Subscription)> + 'a {
+) -> impl Iterator<Item = (Uint128, Addr, Subscription)> + '_ {
     let maxkey = (
         I64Key::from(now.checked_add(1).unwrap()),
         (U128Key::from(0), ""),

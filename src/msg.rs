@@ -2,7 +2,7 @@ use chrono::offset::{FixedOffset, TimeZone};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Coin, Uint128};
+use cosmwasm_std::{Addr, Api, Coin, Uint128};
 use cw0::Expiration;
 
 use crate::cron::CronCompiled;
@@ -24,7 +24,7 @@ pub struct InitMsg {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub enum ExecuteMsg {
     /// create plan, sender will be the plan owner
-    CreatePlan(PlanContent),
+    CreatePlan(PlanContent<String>),
     /// stop plan, sender must be the plan owner
     StopPlan { plan_id: Uint128 },
     /// sender subscribe to some plan
@@ -51,11 +51,11 @@ pub enum ExecuteMsg {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct PlanContent {
+pub struct PlanContent<A> {
     pub title: String,
     pub description: String,
     /// cw20 token address
-    pub token: String,
+    pub token: A,
     /// Amount to be collected for each period
     pub amount: Uint128,
     /// Crontab like specification for the plan
@@ -64,12 +64,22 @@ pub struct PlanContent {
     pub tzoffset: i32,
 }
 
-impl PlanContent {
-    pub fn validate(&self) -> Result<(), ContractError> {
+impl PlanContent<String> {
+    pub fn validate(self, api: &dyn Api) -> Result<PlanContent<Addr>, ContractError> {
         FixedOffset::east_opt(self.tzoffset).ok_or(ContractError::InvalidTimeZoneOffset)?;
-        Ok(())
+        let token = api.addr_validate(&self.token)?;
+        Ok(PlanContent::<Addr> {
+            title: self.title,
+            description: self.description,
+            token,
+            amount: self.amount,
+            cron: self.cron,
+            tzoffset: self.tzoffset,
+        })
     }
+}
 
+impl<A> PlanContent<A> {
     pub fn verify_timestamp(&self, ts: i64) -> bool {
         let datetime = FixedOffset::east(self.tzoffset)
             .timestamp(ts, 0)
