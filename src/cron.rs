@@ -2,15 +2,15 @@ use chrono::{Datelike, NaiveDateTime, Timelike};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::bitset::{BitSet, BitSetIndex};
+use crate::bitset::{BitSetIndex, NonEmptyBitSet};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct CronCompiled {
-    pub minute: BitSet,
-    pub hour: BitSet,
-    pub mday: BitSet,
-    pub month: BitSet,
-    pub wday: BitSet,
+    pub minute: NonEmptyBitSet,
+    pub hour: NonEmptyBitSet,
+    pub mday: NonEmptyBitSet,
+    pub month: NonEmptyBitSet,
+    pub wday: NonEmptyBitSet,
 }
 
 impl CronCompiled {
@@ -18,16 +18,16 @@ impl CronCompiled {
     pub fn verify(&self, datetime: NaiveDateTime) -> bool {
         let time = datetime.time();
         let date = datetime.date();
-        // SAFETY: guarantee of trait chrono::Timelike
-        let minute = BitSetIndex::unsafe_new(time.minute() as u8);
-        // SAFETY: guarantee of trait chrono::Timelike
-        let hour = BitSetIndex::unsafe_new(time.hour() as u8);
-        // SAFETY: guarantee of trait chrono::Datelike
-        let mday = BitSetIndex::unsafe_new(date.day() as u8);
-        // SAFETY: guarantee of trait chrono::Datelike
-        let month = BitSetIndex::unsafe_new(date.month() as u8);
-        // SAFETY: guarantee of num_days_from_sunday
-        let wday = BitSetIndex::unsafe_new(date.weekday().num_days_from_sunday() as u8);
+        // SAFETY: range of value is guaranteed
+        let minute = BitSetIndex::new(time.minute() as usize).unwrap();
+        // SAFETY: range of value is guaranteed
+        let hour = BitSetIndex::new(time.hour() as usize).unwrap();
+        // SAFETY: range of value is guaranteed
+        let mday = BitSetIndex::new(date.day() as usize).unwrap();
+        // SAFETY: range of value is guaranteed
+        let month = BitSetIndex::new(date.month() as usize).unwrap();
+        // SAFETY: range of value is guaranteed
+        let wday = BitSetIndex::new(date.weekday().num_days_from_sunday() as usize).unwrap();
         self.minute.test(minute)
             && self.hour.test(hour)
             && self.mday.test(mday)

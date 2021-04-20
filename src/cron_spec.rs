@@ -1,7 +1,7 @@
 //! Parse and compile crontab syntax, not needed for on-chain code.
 use std::str::FromStr;
 
-use crate::bitset::{BitSet, BitSetIndex};
+use crate::bitset::{BitSetIndex, NonEmptyBitSet};
 use crate::cron::CronCompiled;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -17,18 +17,13 @@ pub enum CronItem {
 }
 
 impl CronItem {
-    pub fn compile(&self) -> BitSet {
-        let mut set = BitSet::new();
+    pub fn compile(&self) -> Option<NonEmptyBitSet> {
         match self {
-            Self::Value(value) => set.set(*value),
+            Self::Value(value) => Some(NonEmptyBitSet::new(*value)),
             Self::Range { start, end, step } => {
-                for idx in (start.value()..=end.value()).step_by(step.value()) {
-                    // SAFETY: idx < end.0 < 64
-                    set.set(BitSetIndex::unsafe_new(idx as u8))
-                }
+                NonEmptyBitSet::from_iter((start.get()..=end.get()).step_by(step.get()))
             }
-        };
-        set
+        }
     }
 }
 
@@ -49,55 +44,35 @@ pub struct CronSpec {
 
 impl CronSpec {
     pub fn compile(&self) -> Result<CronCompiled, CronError> {
-        let minute = compile_component(&self.minute);
-        if let Some(max) = minute.max() {
-            if max.value() > 59 {
-                return Err(CronError::OutOfRange);
-            }
-        } else {
-            return Err(CronError::Empty);
+        let minute = compile_component(&self.minute).ok_or(CronError::Empty)?;
+        if minute.max().get() > 59 {
+            return Err(CronError::OutOfRange);
         }
 
-        let hour = compile_component(&self.hour);
-        if let Some(max) = hour.max() {
-            if max.value() > 23 {
-                return Err(CronError::OutOfRange);
-            }
-        } else {
-            return Err(CronError::Empty);
+        let hour = compile_component(&self.hour).ok_or(CronError::Empty)?;
+        if hour.max().get() > 23 {
+            return Err(CronError::OutOfRange);
         }
 
-        let mday = compile_component(&self.mday);
-        if let Some((min, max)) = mday.bound() {
-            if max.value() > 31 {
-                return Err(CronError::OutOfRange);
-            }
-            if min.value() < 1 {
-                return Err(CronError::OutOfRange);
-            }
-        } else {
-            return Err(CronError::Empty);
+        let mday = compile_component(&self.mday).ok_or(CronError::Empty)?;
+        if mday.max().get() > 31 {
+            return Err(CronError::OutOfRange);
+        }
+        if mday.min().get() < 1 {
+            return Err(CronError::OutOfRange);
         }
 
-        let month = compile_component(&self.month);
-        if let Some((min, max)) = month.bound() {
-            if max.value() > 12 {
-                return Err(CronError::OutOfRange);
-            }
-            if min.value() < 1 {
-                return Err(CronError::OutOfRange);
-            }
-        } else {
-            return Err(CronError::Empty);
+        let month = compile_component(&self.month).ok_or(CronError::Empty)?;
+        if month.max().get() > 12 {
+            return Err(CronError::OutOfRange);
+        }
+        if month.min().get() < 1 {
+            return Err(CronError::OutOfRange);
         }
 
-        let wday = compile_component(&self.wday);
-        if let Some(max) = wday.max() {
-            if max.value() > 6 {
-                return Err(CronError::OutOfRange);
-            }
-        } else {
-            return Err(CronError::Empty);
+        let wday = compile_component(&self.wday).ok_or(CronError::Empty)?;
+        if wday.max().get() > 6 {
+            return Err(CronError::OutOfRange);
         }
 
         Ok(CronCompiled {
@@ -110,16 +85,8 @@ impl CronSpec {
     }
 }
 
-fn compile_component(items: &[CronItem]) -> BitSet {
-    if items.is_empty() {
-        BitSet::new()
-    } else {
-        let mut set = BitSet::new();
-        for item in items.iter() {
-            set.inplace_union(item.compile());
-        }
-        set
-    }
+fn compile_component(items: &[CronItem]) -> Option<NonEmptyBitSet> {
+    NonEmptyBitSet::from_bitset_iter(items.iter().map(|item| item.compile()).filter_map(|x| x))
 }
 
 impl FromStr for CronSpec {
@@ -134,28 +101,28 @@ impl FromStr for CronSpec {
         Ok(CronSpec {
             minute: parse_component(
                 parts[0],
-                BitSetIndex::unsafe_new(0),
-                BitSetIndex::unsafe_new(59),
+                BitSetIndex::new(0).unwrap(),
+                BitSetIndex::new(59).unwrap(),
             )?,
             hour: parse_component(
                 parts[1],
-                BitSetIndex::unsafe_new(0),
-                BitSetIndex::unsafe_new(23),
+                BitSetIndex::new(0).unwrap(),
+                BitSetIndex::new(23).unwrap(),
             )?,
             mday: parse_component(
                 parts[2],
-                BitSetIndex::unsafe_new(1),
-                BitSetIndex::unsafe_new(31),
+                BitSetIndex::new(1).unwrap(),
+                BitSetIndex::new(31).unwrap(),
             )?,
             month: parse_component(
                 parts[3],
-                BitSetIndex::unsafe_new(1),
-                BitSetIndex::unsafe_new(12),
+                BitSetIndex::new(1).unwrap(),
+                BitSetIndex::new(12).unwrap(),
             )?,
             wday: parse_component(
                 parts[4],
-                BitSetIndex::unsafe_new(0),
-                BitSetIndex::unsafe_new(6),
+                BitSetIndex::new(0).unwrap(),
+                BitSetIndex::new(6).unwrap(),
             )?,
         })
     }
@@ -213,11 +180,11 @@ mod tests {
     #[test]
     fn cron_compile() {
         const FULL_CRON: CronCompiled = CronCompiled {
-            minute: BitSet::from_range(0, 59),
-            hour: BitSet::from_range(0, 23),
-            mday: BitSet::from_range(1, 31),
-            wday: BitSet::from_range(0, 6),
-            month: BitSet::from_range(1, 12),
+            minute: NonEmptyBitSet::from_range(0, 59),
+            hour: NonEmptyBitSet::from_range(0, 23),
+            mday: NonEmptyBitSet::from_range(1, 31),
+            wday: NonEmptyBitSet::from_range(0, 6),
+            month: NonEmptyBitSet::from_range(1, 12),
         };
 
         let full = "* * * * *".parse::<CronSpec>().unwrap();

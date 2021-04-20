@@ -1,4 +1,5 @@
 use std::mem;
+use std::num::NonZeroUsize;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -6,92 +7,102 @@ use serde::{Deserialize, Serialize};
 /// u64 is enough for subscription contract
 type Num = u64;
 
+/// non-emptiness is ensured by smart constructor.
 #[derive(
     Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(transparent)]
-pub struct BitSet(pub Num);
+pub struct NonEmptyBitSet(pub Num);
 const NUM_SIZE: usize = mem::size_of::<Num>() * 8;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct OutOfBoundError;
 
-impl BitSet {
+impl NonEmptyBitSet {
     #[inline]
-    pub const fn new() -> Self {
-        Self(0)
+    pub const fn new(i: BitSetIndex) -> Self {
+        Self(1 << i.get())
     }
 
-    /// Build bitset from range, can be called at compile time.
+    /// Construct with iterator
+    pub fn from_iter<I: IntoIterator<Item = usize>>(iter: I) -> Option<Self> {
+        let mut set = Self(0);
+        for i in iter {
+            set.set(BitSetIndex::new(i)?);
+        }
+        if set.0 != 0 {
+            Some(set)
+        } else {
+            None
+        }
+    }
+
+    /// Construct by merging multiple bitsets
+    pub fn from_bitset_iter<I: IntoIterator<Item = NonEmptyBitSet>>(iter: I) -> Option<Self> {
+        let mut set = Self(0);
+        for i in iter {
+            set.inplace_union(i);
+        }
+        if set.0 != 0 {
+            Some(set)
+        } else {
+            None
+        }
+    }
+
+    /// Build bitset from range, only for compile time call(const).
+    /// Use `from_iter` instead for non-const situation.
     ///
-    /// PANIC: if input is out of range
+    /// PANIC: if input is out of range or empty
     pub const fn from_range(start: usize, end: usize) -> Self {
         let start = BitSetIndex::new(start).unwrap();
         let end = BitSetIndex::new(end).unwrap();
-        let mut set = Self::new();
+        let mut set = 0;
         let mut idx = start.0;
         while idx <= end.0 {
             // SAFETY: bound checked above
-            set = set.copy_set(BitSetIndex(idx));
+            set = set | 1 << idx;
             idx += 1;
         }
-        set
+        if set == 0 {
+            panic!("bitset is empty");
+        }
+        NonEmptyBitSet(set)
     }
 
     pub fn set(&mut self, i: BitSetIndex) {
-        self.0 |= 1 << i.value();
-    }
-
-    const fn copy_set(self, i: BitSetIndex) -> Self {
-        Self(self.0 | 1 << i.value())
-    }
-
-    pub fn clear(&mut self, i: BitSetIndex) {
-        self.0 &= !(1 << i.value());
+        self.0 |= 1 << i.get();
     }
 
     pub fn test(&self, i: BitSetIndex) -> bool {
-        self.0 & (1 << i.value()) != 0
+        self.0 & (1 << i.get()) != 0
     }
 
     #[inline]
-    pub fn len(self) -> usize {
-        self.0.count_ones() as usize
+    pub fn len(self) -> NonZeroUsize {
+        // SAFETY: guaranteed by NonEmptyBitSet constructor
+        unsafe { NonZeroUsize::new_unchecked(self.0.count_ones() as usize) }
     }
 
     #[inline]
-    pub fn is_empty(self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    pub fn inplace_union(&mut self, other: BitSet) {
+    pub fn inplace_union(&mut self, other: NonEmptyBitSet) {
         self.0 |= other.0;
-    }
-
-    #[inline]
-    pub fn intersection(&self, other: BitSet) -> BitSet {
-        BitSet(self.0 & other.0)
-    }
-
-    /// Return the indics of lowest set bit and highest set bit.
-    /// return None if empty
-    pub fn bound(self) -> Option<(BitSetIndex, BitSetIndex)> {
-        Some((self.min()?, self.max()?))
     }
 
     /// Return the index of lowest set bit,
     /// return None if empty
-    pub fn min(self) -> Option<BitSetIndex> {
-        BitSetIndex::new(self.0.trailing_zeros() as usize)
+    #[inline]
+    pub fn min(self) -> BitSetIndex {
+        // SAFETY: non-empty guarantee
+        BitSetIndex(self.0.trailing_zeros() as u8)
     }
 
     /// Return the index of highest set bit,
     /// return None if empty
-    pub fn max(self) -> Option<BitSetIndex> {
-        // SAFETY: safe
-        63u8.checked_sub(self.0.leading_zeros() as u8)
-            .map(BitSetIndex)
+    #[inline]
+    pub fn max(self) -> BitSetIndex {
+        // SAFETY: non-empty guarantee
+        BitSetIndex(63u8 - self.0.leading_zeros() as u8)
     }
 
     /// Returns the next bit set from the specified index,
@@ -123,15 +134,8 @@ impl BitSetIndex {
         }
     }
 
-    pub const fn unsafe_new(u: u8) -> Self {
-        if u as usize >= NUM_SIZE {
-            panic!("out of range bitset index");
-        }
-        Self(u)
-    }
-
     #[inline]
-    pub const fn value(self) -> usize {
+    pub const fn get(self) -> usize {
         self.0 as usize
     }
 
@@ -155,52 +159,47 @@ mod tests {
 
     #[test]
     fn bitset_operations_work() {
-        let mut set = BitSet::new();
-
-        assert_eq!(set.len(), 0);
-        assert!(set.is_empty());
-        assert_eq!(set.min(), None);
-        assert_eq!(set.max(), None);
+        let mut set = NonEmptyBitSet::new(BitSetIndex::new(0).unwrap());
+        assert_eq!(set.len().get(), 1);
+        assert_eq!(set.min().get(), 0);
+        assert_eq!(set.max().get(), 0);
 
         let v0 = BitSetIndex::new(0).unwrap();
         let v63 = BitSetIndex::new(63).unwrap();
 
-        assert!(!set.test(v0));
+        assert!(set.test(v0));
         assert!(!set.test(v63));
 
-        set.set(v0);
         set.set(v63);
 
-        assert!(set.test(v0));
         assert!(set.test(v63));
 
-        assert_eq!(set.len(), 2);
-        assert_eq!(set.min().unwrap().value(), 0);
-        assert_eq!(set.max().unwrap().value(), 63);
+        assert_eq!(set.len().get(), 2);
+        assert_eq!(set.min().get(), 0);
+        assert_eq!(set.max().get(), 63);
     }
 
     #[test]
     fn bitset_from_range() {
-        const SET: BitSet = BitSet::from_range(1, 12);
-        assert_eq!(SET.max().unwrap().value(), 12);
-        assert_eq!(SET.min().unwrap().value(), 1);
-        assert_eq!(SET.len(), 12);
+        const SET: NonEmptyBitSet = NonEmptyBitSet::from_range(1, 12);
+        assert_eq!(SET.max().get(), 12);
+        assert_eq!(SET.min().get(), 1);
+        assert_eq!(SET.len().get(), 12);
     }
 
     #[test]
     fn bitset_next_set() {
-        let mut set = BitSet::new();
-        set.set(BitSetIndex::unsafe_new(0));
-        set.set(BitSetIndex::unsafe_new(10));
+        let mut set = NonEmptyBitSet::new(BitSetIndex::new(0).unwrap());
+        set.set(BitSetIndex::new(10).unwrap());
 
         assert_eq!(
-            set.next_set(BitSetIndex::unsafe_new(0)),
-            Some(BitSetIndex::unsafe_new(0))
+            set.next_set(BitSetIndex::new(0).unwrap()),
+            Some(BitSetIndex::new(0).unwrap())
         );
         assert_eq!(
-            set.next_set(BitSetIndex::unsafe_new(1)),
-            Some(BitSetIndex::unsafe_new(10))
+            set.next_set(BitSetIndex::new(1).unwrap()),
+            Some(BitSetIndex::new(10).unwrap())
         );
-        assert_eq!(set.next_set(BitSetIndex::unsafe_new(11)), None);
+        assert_eq!(set.next_set(BitSetIndex::new(11).unwrap()), None);
     }
 }
