@@ -21,7 +21,7 @@ impl CronItem {
         match self {
             Self::Value(value) => Some(NonEmptyBitSet::new(*value)),
             Self::Range { start, end, step } => {
-                NonEmptyBitSet::from_iter((start.get()..=end.get()).step_by(step.get()))
+                NonEmptyBitSet::from_items((start.get()..=end.get()).step_by(step.get()))
             }
         }
     }
@@ -86,7 +86,7 @@ impl CronSpec {
 }
 
 fn compile_component(items: &[CronItem]) -> Option<NonEmptyBitSet> {
-    NonEmptyBitSet::from_bitset_iter(items.iter().map(|item| item.compile()).filter_map(|x| x))
+    NonEmptyBitSet::from_bitsets(items.iter().map(|item| item.compile()).flatten())
 }
 
 impl FromStr for CronSpec {
