@@ -25,7 +25,7 @@ impl NonEmptyBitSet {
     }
 
     /// Construct with iterator
-    pub fn from_iter<I: IntoIterator<Item = usize>>(iter: I) -> Option<Self> {
+    pub fn from_items<I: IntoIterator<Item = usize>>(iter: I) -> Option<Self> {
         let mut set = Self(0);
         for i in iter {
             set.set(BitSetIndex::new(i)?);
@@ -38,7 +38,7 @@ impl NonEmptyBitSet {
     }
 
     /// Construct by merging multiple bitsets
-    pub fn from_bitset_iter<I: IntoIterator<Item = NonEmptyBitSet>>(iter: I) -> Option<Self> {
+    pub fn from_bitsets<I: IntoIterator<Item = NonEmptyBitSet>>(iter: I) -> Option<Self> {
         let mut set = Self(0);
         for i in iter {
             set.inplace_union(i);
@@ -51,7 +51,7 @@ impl NonEmptyBitSet {
     }
 
     /// Build bitset from range, only for compile time call(const).
-    /// Use `from_iter` instead for non-const situation.
+    /// Use `from_items` instead for non-const situation.
     ///
     /// PANIC: if input is out of range or empty
     pub const fn from_range(start: usize, end: usize) -> Self {
@@ -60,8 +60,7 @@ impl NonEmptyBitSet {
         let mut set = 0;
         let mut idx = start.0;
         while idx <= end.0 {
-            // SAFETY: bound checked above
-            set = set | 1 << idx;
+            set |= 1 << idx;
             idx += 1;
         }
         if set == 0 {
