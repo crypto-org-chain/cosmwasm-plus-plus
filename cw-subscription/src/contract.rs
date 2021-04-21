@@ -29,7 +29,8 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
-) -> StdResult<Response> {
+) -> Result<Response, ContractError> {
+    msg.params.validate()?;
     PARAMS.save(deps.storage, &msg.params)?;
     Ok(Response::default())
 }

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use chrono::offset::{FixedOffset, TimeZone};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -14,6 +16,37 @@ pub struct Params {
     pub required_deposit_plan: Vec<Coin>,
     /// Minimal native tokens deposit need for each subscription, will refunded after deleted
     pub required_deposit_subscription: Vec<Coin>,
+}
+
+fn has_duplicate_denom(items: &[Coin]) -> bool {
+    let set = items.iter().map(|coin| &coin.denom).collect::<HashSet<_>>();
+    set.len() != items.len()
+}
+
+impl Params {
+    pub fn validate(&self) -> Result<(), ContractError> {
+        if has_duplicate_denom(&self.required_deposit_plan) {
+            return Err(ContractError::InvalidCoins);
+        }
+        if has_duplicate_denom(&self.required_deposit_subscription) {
+            return Err(ContractError::InvalidCoins);
+        }
+        if self
+            .required_deposit_plan
+            .iter()
+            .any(|coin| coin.amount == 0u128.into())
+        {
+            return Err(ContractError::InvalidCoins);
+        }
+        if self
+            .required_deposit_subscription
+            .iter()
+            .any(|coin| coin.amount == 0u128.into())
+        {
+            return Err(ContractError::InvalidCoins);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

@@ -21,4 +21,6 @@ pub enum ContractError {
     InvalidTimeZoneOffset,
     #[error("the sender is not plan owner")]
     NotPlanOwner,
+    #[error("invalid input coins")]
+    InvalidCoins,
 }
