@@ -12,11 +12,8 @@ type Num = u64;
     Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(transparent)]
-pub struct NonEmptyBitSet(pub Num);
+pub struct NonEmptyBitSet(Num);
 const NUM_SIZE: usize = mem::size_of::<Num>() * 8;
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct OutOfBoundError;
 
 impl NonEmptyBitSet {
     #[inline]
@@ -122,7 +119,7 @@ impl NonEmptyBitSet {
     Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(transparent)]
-pub struct BitSetIndex(pub u8);
+pub struct BitSetIndex(u8);
 
 impl BitSetIndex {
     pub const fn new(u: usize) -> Option<Self> {

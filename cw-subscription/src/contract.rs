@@ -390,7 +390,7 @@ fn query_collectible_subscriptions(deps: Deps, env: Env, limit: Option<u32>) -> 
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_binary, Addr};
+    use cosmwasm_std::{from_binary, Addr, Coin};
 
     use super::*;
 
@@ -404,7 +404,6 @@ mod tests {
         // subscribe
         // collect payment
         // query
-        let _native_token = "cro".to_owned();
         let merchant = String::from("merchant");
         let user = String::from("user");
         let token_contract = String::from("cw20-contract");
@@ -433,7 +432,7 @@ mod tests {
         let rsp = execute(
             deps.as_mut(),
             env.clone(),
-            mock_info(merchant.as_ref(), &[]),
+            mock_info(&merchant, &[]),
             plan_msg,
         )
         .unwrap();
@@ -447,7 +446,7 @@ mod tests {
             plan,
             Plan {
                 id: 1u128.into(),
-                owner: Addr::unchecked(merchant),
+                owner: Addr::unchecked(merchant.clone()),
                 content: content.validate(&deps.api).unwrap(),
                 deposit: vec![]
             }
@@ -486,7 +485,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 env.clone(),
-                mock_info(user.as_ref(), &[]),
+                mock_info(&user, &[]),
                 ExecuteMsg::Subscribe {
                     plan_id: 1u128.into(),
                     expires: Expiration::Never {},
@@ -499,7 +498,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 env.clone(),
-                mock_info(user.as_ref(), &[]),
+                mock_info(&user, &[]),
                 ExecuteMsg::Subscribe {
                     plan_id: 1u128.into(),
                     expires: Expiration::Never {},
@@ -512,7 +511,7 @@ mod tests {
         execute(
             deps.as_mut(),
             env.clone(),
-            mock_info(user.as_ref(), &[]),
+            mock_info(&user, &[]),
             ExecuteMsg::Subscribe {
                 plan_id: 1u128.into(),
                 expires: Expiration::Never {},
@@ -520,6 +519,57 @@ mod tests {
             },
         )
         .unwrap();
+
+        // query subscriptions
+        let rsp: Subscription = from_binary(
+            &query(
+                deps.as_ref(),
+                env.clone(),
+                QueryMsg::Subscription {
+                    plan_id: 1u128.into(),
+                    subscriber: user.clone(),
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            rsp,
+            Subscription {
+                expires: Expiration::Never {},
+                last_collection_time: env.block.time.try_into().unwrap(),
+                next_collection_time: 1_571_797_440,
+                deposit: vec![],
+            }
+        );
+        let rsp: SubscriptionsResponse = from_binary(
+            &query(
+                deps.as_ref(),
+                env.clone(),
+                QueryMsg::ListSubscriptions {
+                    plan_id: 1u128.into(),
+                    start_after: None,
+                    limit: None,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(rsp.subscriptions.len(), 1);
+        let rsp: SubscriptionsResponse = from_binary(
+            &query(
+                deps.as_ref(),
+                env.clone(),
+                QueryMsg::ListSubscriptions {
+                    plan_id: 1u128.into(),
+                    start_after: Some(user.clone()),
+                    limit: None,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(rsp.subscriptions.len(), 0);
 
         // query collectible subscriptions
         {
@@ -555,7 +605,7 @@ mod tests {
                 execute(
                     deps.as_mut(),
                     env.clone(),
-                    mock_info(user.as_ref(), &[]),
+                    mock_info(&user, &[]),
                     ExecuteMsg::Collection {
                         items: vec![CollectOne {
                             plan_id,
@@ -574,7 +624,7 @@ mod tests {
                 execute(
                     deps.as_mut(),
                     env.clone(),
-                    mock_info(user.as_ref(), &[]),
+                    mock_info(&user, &[]),
                     ExecuteMsg::Collection {
                         items: vec![CollectOne {
                             plan_id,
@@ -594,7 +644,7 @@ mod tests {
             let rsp = execute(
                 deps.as_mut(),
                 env.clone(),
-                mock_info(user.as_ref(), &[]),
+                mock_info(&user, &[]),
                 ExecuteMsg::Collection {
                     items: vec![CollectOne {
                         plan_id,
@@ -608,5 +658,127 @@ mod tests {
             // one cw20 transfer message for each successful payment collection
             assert_eq!(rsp.messages.len(), 1);
         }
+
+        // stop-plan
+        assert_matches!(
+            execute(
+                deps.as_mut(),
+                env.clone(),
+                mock_info(&user, &[]),
+                ExecuteMsg::StopPlan { plan_id },
+            ),
+            Err(ContractError::NotPlanOwner)
+        );
+        let rsp = execute(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(&merchant, &[]),
+            ExecuteMsg::StopPlan { plan_id },
+        )
+        .unwrap();
+        let actions: Vec<_> = rsp
+            .attributes
+            .iter()
+            .filter_map(|attr| {
+                if attr.key == "action" {
+                    Some(attr.value.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(actions, ["unsubscribe", "stop-plan"]);
+    }
+
+    #[test]
+    fn check_deposit_refund() {
+        let native_token = "basecro".to_owned();
+        let merchant = String::from("merchant");
+        let user = String::from("user");
+        let token_contract = String::from("cw20-contract");
+
+        let mut deps = mock_dependencies(&[]);
+        let msg = InitMsg {
+            params: Params {
+                required_deposit_plan: vec![Coin::new(1000u128.into(), native_token.clone())],
+                required_deposit_subscription: vec![Coin::new(
+                    1000u128.into(),
+                    native_token.clone(),
+                )],
+            },
+        };
+        let env = mock_env();
+
+        let res = instantiate(deps.as_mut(), env.clone(), mock_info("operator", &[]), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // deposit into plan
+        let content = PlanContent::<String> {
+            title: "test plan1".to_owned(),
+            description: "test plan1".to_owned(),
+            token: token_contract.clone(),
+            amount: 1u128.into(),
+            cron: "* * * * *".parse::<CronSpec>().unwrap().compile().unwrap(),
+            tzoffset: 0,
+        };
+        let plan_msg = ExecuteMsg::CreatePlan(content.clone());
+        // not enough deposit
+        assert_matches!(
+            execute(
+                deps.as_mut(),
+                env.clone(),
+                mock_info(&merchant, &[]),
+                plan_msg.clone(),
+            ),
+            Err(ContractError::NotEnoughDeposit)
+        );
+        // successful
+        let rsp = execute(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(
+                &merchant,
+                &[Coin::new(1000u128.into(), native_token.clone())],
+            ),
+            plan_msg,
+        )
+        .unwrap();
+        let plan_id: Uint128 = rsp.attributes[1].value.parse::<u128>().unwrap().into();
+
+        // not enough deposit
+        assert_matches!(
+            execute(
+                deps.as_mut(),
+                env.clone(),
+                mock_info(&user, &[]),
+                ExecuteMsg::Subscribe {
+                    plan_id,
+                    expires: Expiration::AtTime(1_571_797_440),
+                    next_collection_time: 1_571_797_420,
+                }
+            ),
+            Err(ContractError::NotEnoughDeposit)
+        );
+        let _rsp = execute(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(&user, &[Coin::new(1000u128.into(), native_token.clone())]),
+            ExecuteMsg::Subscribe {
+                plan_id,
+                expires: Expiration::AtTime(1_571_797_440),
+                next_collection_time: 1_571_797_440,
+            },
+        )
+        .unwrap();
+
+        // stop plan, two refund messages
+        let rsp = execute(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(&merchant, &[]),
+            ExecuteMsg::StopPlan { plan_id },
+        )
+        .unwrap();
+        assert_eq!(rsp.messages.len(), 2);
     }
 }
