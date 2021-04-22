@@ -23,4 +23,10 @@ pub enum ContractError {
     NotPlanOwner,
     #[error("invalid input coins")]
     InvalidCoins,
+    #[error("plan title too long")]
+    TitleTooLong,
+    #[error("plan description too long")]
+    DescriptionTooLong,
+    #[error("invalid collection time")]
+    InvalidCollectionTime,
 }

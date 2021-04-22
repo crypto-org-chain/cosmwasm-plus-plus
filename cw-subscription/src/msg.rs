@@ -10,6 +10,9 @@ use cw0::Expiration;
 use crate::cron::CronCompiled;
 use crate::error::ContractError;
 
+const MAX_DESCRIPTION_LENGTH: usize = 5000;
+const MAX_TITLE_LENGTH: usize = 140;
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Params {
     /// Minimal native tokens deposit need for each plan, will refunded after deleted
@@ -83,7 +86,7 @@ pub enum ExecuteMsg {
     Collection { items: Vec<CollectOne> },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct PlanContent<A> {
     pub title: String,
     pub description: String,
@@ -99,6 +102,13 @@ pub struct PlanContent<A> {
 
 impl PlanContent<String> {
     pub fn validate(self, api: &dyn Api) -> Result<PlanContent<Addr>, ContractError> {
+        if self.title.len() > MAX_TITLE_LENGTH {
+            return Err(ContractError::TitleTooLong);
+        }
+        if self.description.len() > MAX_DESCRIPTION_LENGTH {
+            return Err(ContractError::DescriptionTooLong);
+        }
+
         FixedOffset::east_opt(self.tzoffset).ok_or(ContractError::InvalidTimeZoneOffset)?;
         let token = api.addr_validate(&self.token)?;
         Ok(PlanContent::<Addr> {

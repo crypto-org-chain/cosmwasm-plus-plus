@@ -7,9 +7,9 @@ use crate::state::{Plan, Subscription};
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    /// Query one plan, response type is Plan
+    /// Query one plan, response type is Plan<Addr>
     Plan { plan_id: Uint128 },
-    /// List plans, support pagination
+    /// List plans, support pagination, response type is PlansResponse
     ListPlans {
         start_after: Option<Uint128>,
         limit: Option<u32>,
@@ -19,7 +19,7 @@ pub enum QueryMsg {
         plan_id: Uint128,
         subscriber: String,
     },
-    /// List subscriptions, support pagination
+    /// List subscriptions, support pagination, response type is SubscriptionsResponse
     ListSubscriptions {
         plan_id: Uint128,
         start_after: Option<String>,

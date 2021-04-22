@@ -3,9 +3,9 @@ use std::convert::TryInto;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{from_slice, Addr, Coin, Order, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Coin, Order, StdResult, Storage, Uint128};
 use cw0::Expiration;
-use cw_storage_plus::{Bound, I64Key, Item, Map, PrimaryKey, U128Key};
+use cw_storage_plus::{Bound, I64Key, Item, Map, U128Key};
 
 use crate::msg::{Params, PlanContent};
 
@@ -27,11 +27,11 @@ pub const SUBSCRIPTIONS: Map<SubscriptionKey, Subscription> = Map::new("plan-sub
 // pub const Q_EXPIRATION: Map<(i64, Uint128), ()> = Map::new("subs-expiration");
 /// Subscription queue ordered by next_collection_time
 /// (next-collection-time, plan-id, subscriber) -> ()
-pub const Q_COLLECTION: Map<(I64Key, SubscriptionKey), ()> = Map::new("subs-collection");
+pub const Q_COLLECTION: Map<(I64Key, SubscriptionKey), ()> = Map::new("q-collection");
 
 const ZERO: Uint128 = Uint128::zero();
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
     pub id: Uint128,
     pub owner: Addr,
@@ -42,7 +42,8 @@ pub struct Plan {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Subscription {
     pub expires: Expiration,
-    pub last_collection_time: Option<i64>,
+    /// Initialized to current block time created
+    pub last_collection_time: i64,
     pub next_collection_time: i64,
     pub deposit: Vec<Coin>,
 }
@@ -77,32 +78,37 @@ pub fn iter_subscriptions_by_plan(
         })
 }
 
-/// PANIC: if deserialization failed caused by corrupted storage
+/// PANIC: if deserialization failed because of corrupted storage
 pub fn iter_collectible_subscriptions(
     store: &dyn Storage,
     now: i64,
-) -> impl Iterator<Item = (Uint128, Addr, Subscription)> + '_ {
-    let maxkey = (
+) -> impl Iterator<Item = (i64, Uint128, Addr)> + '_ {
+    let minkey = Q_COLLECTION.key((I64Key::from(0), (U128Key::from(0), "")));
+    let maxkey = Q_COLLECTION.key((
         I64Key::from(now.checked_add(1).unwrap()),
         (U128Key::from(0), ""),
-    );
+    ));
     store
-        .range(
-            None,
-            Some(&PrimaryKey::joined_key(&maxkey)),
-            Order::Ascending,
-        )
-        .map(|(k, v)| {
-            let (end, s) = decode_key_step(&k).unwrap();
-            let token_id = u128::from_be_bytes(s.try_into().unwrap()).into();
-            let (_end, s) = decode_key_step(&k[end..]).unwrap();
-            let addr = Addr::unchecked(String::from_utf8(s.to_owned()).unwrap());
-            (token_id, addr, from_slice::<Subscription>(&v).unwrap())
+        .range(Some(&minkey), Some(&maxkey), Order::Ascending)
+        .map(|(k, _)| {
+            // decode key, TODO more elegant way?
+            // skip the prefix
+            let (_, k) = decode_key_step(&k).unwrap();
+
+            let (s, k) = decode_key_step(k).unwrap();
+            let collection_time = i64::from_be_bytes(s.try_into().unwrap());
+
+            let (s, k) = decode_key_step(k).unwrap();
+            let plan_id = u128::from_be_bytes(s.try_into().unwrap());
+
+            // the last part is not prefixed with length
+            let addr = Addr::unchecked(String::from_utf8(k.to_owned()).unwrap());
+            (collection_time, plan_id.into(), addr)
         })
 }
 
 /// decode key, depends on the implemention details in cw-storage-plus
-fn decode_key_step(buf: &[u8]) -> Option<(usize, &[u8])> {
+fn decode_key_step(buf: &[u8]) -> Option<(&[u8], &[u8])> {
     if buf.len() < 2 {
         return None;
     }
@@ -110,5 +116,5 @@ fn decode_key_step(buf: &[u8]) -> Option<(usize, &[u8])> {
     if buf.len() < end {
         return None;
     }
-    Some((end, &buf[2..end]))
+    Some((&buf[2..end], &buf[end..]))
 }

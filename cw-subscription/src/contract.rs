@@ -159,13 +159,18 @@ fn execute_subscribe(
     }
 
     // verify next_collection_time
+    if next_collection_time <= env.block.time.try_into().unwrap() {
+        return Err(ContractError::InvalidCollectionTime);
+    }
     let plan = PLANS.load(deps.storage, plan_id.u128().into())?;
-    plan.content.verify_timestamp(next_collection_time);
+    if !plan.content.verify_timestamp(next_collection_time) {
+        return Err(ContractError::InvalidCollectionTime);
+    }
 
     // insert new subscription
     let sub = Subscription {
         expires,
-        last_collection_time: None,
+        last_collection_time: env.block.time.try_into().unwrap(),
         next_collection_time,
         deposit: info.funds,
     };
@@ -277,15 +282,13 @@ fn execute_collection(deps: DepsMut, items: Vec<CollectOne>) -> Result<Response,
         let plan = PLANS.load(deps.storage, item.plan_id.u128().into())?;
         let key = (item.plan_id.u128().into(), subscriber.as_str());
         let mut subscription = SUBSCRIPTIONS.load(deps.storage, key.clone())?;
-        if let Some(last_collection_time) = subscription.last_collection_time {
-            if item.current_collection_time <= last_collection_time {
-                // TODO handle failure
-                continue;
-            }
+        if item.current_collection_time <= subscription.last_collection_time {
+            // TODO handle failure
+            continue;
         }
         // verify collection time match cron spec
-        if !plan.content.verify_timestamp(item.current_collection_time)
-            || !plan.content.verify_timestamp(item.next_collection_time)
+        if !(plan.content.verify_timestamp(item.current_collection_time)
+            && plan.content.verify_timestamp(item.next_collection_time))
         {
             // TODO handle failure
             continue;
@@ -304,7 +307,7 @@ fn execute_collection(deps: DepsMut, items: Vec<CollectOne>) -> Result<Response,
         }));
 
         // update next_collection_time
-        subscription.last_collection_time = Some(item.current_collection_time);
+        subscription.last_collection_time = item.current_collection_time;
         Q_COLLECTION.remove(
             deps.storage,
             (subscription.next_collection_time.into(), key.clone()),
@@ -369,9 +372,241 @@ fn query_subscriptions(
 
 fn query_collectible_subscriptions(deps: Deps, env: Env, limit: Option<u32>) -> StdResult<Binary> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let subscriptions =
+    let items: Vec<_> =
         iter_collectible_subscriptions(deps.storage, env.block.time.try_into().unwrap())
             .take(limit)
             .collect();
+    let subscriptions = items
+        .into_iter()
+        .map(|(_, plan_id, subscriber)| {
+            SUBSCRIPTIONS
+                .load(deps.storage, (plan_id.u128().into(), subscriber.as_str()))
+                .map(|sub| (plan_id, subscriber, sub))
+        })
+        .collect::<StdResult<Vec<_>>>()?;
     to_binary(&SubscriptionsResponse { subscriptions })
+}
+
+#[cfg(test)]
+mod tests {
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{from_binary, Addr};
+
+    use super::*;
+
+    use crate::cron_spec::CronSpec;
+    use crate::msg::Params;
+
+    #[test]
+    fn check_basic_flow() {
+        // instantiate a contract
+        // create plan
+        // subscribe
+        // collect payment
+        // query
+        let _native_token = "cro".to_owned();
+        let merchant = String::from("merchant");
+        let user = String::from("user");
+        let token_contract = String::from("cw20-contract");
+
+        let mut deps = mock_dependencies(&[]);
+        let msg = InitMsg {
+            params: Params {
+                required_deposit_plan: vec![],
+                required_deposit_subscription: vec![],
+            },
+        };
+        let env = mock_env();
+
+        let res = instantiate(deps.as_mut(), env.clone(), mock_info("operator", &[]), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let content = PlanContent::<String> {
+            title: "test plan1".to_owned(),
+            description: "test plan1".to_owned(),
+            token: token_contract.clone(),
+            amount: 1u128.into(),
+            cron: "* * * * *".parse::<CronSpec>().unwrap().compile().unwrap(),
+            tzoffset: 0,
+        };
+        let plan_msg = ExecuteMsg::CreatePlan(content.clone());
+        let rsp = execute(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(merchant.as_ref(), &[]),
+            plan_msg,
+        )
+        .unwrap();
+        let plan_id: Uint128 = rsp.attributes[1].value.parse::<u128>().unwrap().into();
+
+        // query one plan
+        let plan: Plan =
+            from_binary(&query(deps.as_ref(), env.clone(), QueryMsg::Plan { plan_id }).unwrap())
+                .unwrap();
+        assert_eq!(
+            plan,
+            Plan {
+                id: 1u128.into(),
+                owner: Addr::unchecked(merchant),
+                content: content.validate(&deps.api).unwrap(),
+                deposit: vec![]
+            }
+        );
+
+        // list plans
+        let plans: PlansResponse = from_binary(
+            &query(
+                deps.as_ref(),
+                env.clone(),
+                QueryMsg::ListPlans {
+                    start_after: None,
+                    limit: None,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(plans.plans.len(), 1);
+        let plans: PlansResponse = from_binary(
+            &query(
+                deps.as_ref(),
+                env.clone(),
+                QueryMsg::ListPlans {
+                    start_after: Some(plans.plans[0].id),
+                    limit: None,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(plans.plans.len(), 0);
+
+        // subscribe failures
+        assert_matches!(
+            execute(
+                deps.as_mut(),
+                env.clone(),
+                mock_info(user.as_ref(), &[]),
+                ExecuteMsg::Subscribe {
+                    plan_id: 1u128.into(),
+                    expires: Expiration::Never {},
+                    next_collection_time: 0,
+                },
+            ),
+            Err(ContractError::InvalidCollectionTime)
+        );
+        assert_matches!(
+            execute(
+                deps.as_mut(),
+                env.clone(),
+                mock_info(user.as_ref(), &[]),
+                ExecuteMsg::Subscribe {
+                    plan_id: 1u128.into(),
+                    expires: Expiration::Never {},
+                    next_collection_time: 1_571_797_420,
+                },
+            ),
+            Err(ContractError::InvalidCollectionTime)
+        );
+        // subscribe succeed
+        execute(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(user.as_ref(), &[]),
+            ExecuteMsg::Subscribe {
+                plan_id: 1u128.into(),
+                expires: Expiration::Never {},
+                next_collection_time: 1_571_797_440,
+            },
+        )
+        .unwrap();
+
+        // query collectible subscriptions
+        {
+            let mut env = env.clone();
+            let rsp: SubscriptionsResponse = from_binary(
+                &query(
+                    deps.as_ref(),
+                    env.clone(),
+                    QueryMsg::CollectibleSubscriptions { limit: None },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(rsp.subscriptions.len(), 0);
+
+            env.block.time = 1_571_797_440;
+            let rsp: SubscriptionsResponse = from_binary(
+                &query(
+                    deps.as_ref(),
+                    env.clone(),
+                    QueryMsg::CollectibleSubscriptions { limit: None },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(rsp.subscriptions.len(), 1);
+
+            // collect payment
+            let (plan_id, subscriber, sub) = rsp.subscriptions[0].clone();
+
+            // test validations
+            assert_eq!(
+                execute(
+                    deps.as_mut(),
+                    env.clone(),
+                    mock_info(user.as_ref(), &[]),
+                    ExecuteMsg::Collection {
+                        items: vec![CollectOne {
+                            plan_id,
+                            subscriber: subscriber.clone().into(),
+                            current_collection_time: 0,
+                            next_collection_time: sub.next_collection_time + 60,
+                        }],
+                    },
+                )
+                .unwrap()
+                .messages
+                .len(),
+                0
+            );
+            assert_eq!(
+                execute(
+                    deps.as_mut(),
+                    env.clone(),
+                    mock_info(user.as_ref(), &[]),
+                    ExecuteMsg::Collection {
+                        items: vec![CollectOne {
+                            plan_id,
+                            subscriber: subscriber.clone().into(),
+                            current_collection_time: sub.next_collection_time,
+                            next_collection_time: sub.next_collection_time + 61,
+                        }],
+                    },
+                )
+                .unwrap()
+                .messages
+                .len(),
+                0
+            );
+
+            // success path
+            let rsp = execute(
+                deps.as_mut(),
+                env.clone(),
+                mock_info(user.as_ref(), &[]),
+                ExecuteMsg::Collection {
+                    items: vec![CollectOne {
+                        plan_id,
+                        subscriber: subscriber.into(),
+                        current_collection_time: sub.next_collection_time,
+                        next_collection_time: sub.next_collection_time + 60,
+                    }],
+                },
+            )
+            .unwrap();
+            // one cw20 transfer message for each successful payment collection
+            assert_eq!(rsp.messages.len(), 1);
+        }
+    }
 }
