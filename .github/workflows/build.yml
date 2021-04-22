@@ -32,6 +32,24 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+        env:
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
+      - name: Pre-installing grcov
+        uses: actions-rs/install@v0.1
+        with:
+          crate: grcov
+          use-tool-cache: true
+      - name: Gather coverage data
+        id: coverage
+        uses: actions-rs/grcov@v0.1
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ${{ steps.coverage.outputs.report }}
+          flags: unittests
+          fail_ci_if_error: true
   build:
     runs-on: ${{ matrix.os }}
     strategy:
