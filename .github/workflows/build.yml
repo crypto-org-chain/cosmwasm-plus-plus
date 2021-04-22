@@ -2,6 +2,11 @@ name: Build
 
 on:
   pull_request:
+    paths:
+      - '**.rs'
+      - '**Cargo.toml'
+      - '**Cargo.lock'
+      - '.github/**'
   push:
     branches:
       - main
@@ -50,7 +55,7 @@ jobs:
           file: ${{ steps.coverage.outputs.report }}
           flags: unittests
           fail_ci_if_error: true
-  build:
+  build-wasm:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
