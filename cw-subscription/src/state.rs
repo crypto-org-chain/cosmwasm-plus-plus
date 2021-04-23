@@ -39,7 +39,7 @@ pub struct Plan {
     pub deposit: Vec<Coin>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Subscription {
     pub expires: Expiration,
     /// Initialized to current block time created
