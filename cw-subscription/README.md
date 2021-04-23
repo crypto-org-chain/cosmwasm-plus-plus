@@ -3,6 +3,12 @@
 Subscription contract enable merchants to collect payments from user periodically. It works with CW20 tokens, user
 should set approval to subscription contract in advance.
 
+## Instantiate
+
+`params: Params {required_deposit_plan, required_deposit_subscription}` - Since plans and subscriptions will keep
+occupying on-chain storage space until deleted, to incentivise user to release the storage space, we require some native
+tokens deposited to each plan and subscription. The deposited tokens are refunded when plan/subscription get deleted.
+
 ## Messages
 
 `CreatePlan(PlanContent{ title, description, token, amount, cron, tzoffset})` - This create a subscription plan by
