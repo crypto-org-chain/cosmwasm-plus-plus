@@ -2,11 +2,6 @@ name: Build
 
 on:
   pull_request:
-    paths:
-      - '**.rs'
-      - '**Cargo.toml'
-      - '**Cargo.lock'
-      - '.github/**'
   push:
     branches:
       - main
@@ -17,37 +12,60 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: technote-space/get-diff-action@v4
+        with:
+          PATTERNS: |
+            **/*.rs
+            **/Cargo.toml
+            .github/**
+          FILES: |
+            Cargo.toml
+            Cargo.lock
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: nightly
             components: clippy
             override: true
+        if: env.GIT_DIFF
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features -- -D warnings
+        if: env.GIT_DIFF
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: technote-space/get-diff-action@v4
+        with:
+          PATTERNS: |
+            **/*.rs
+            .github/**
+          FILES: |
+            Cargo.toml
+            Cargo.lock
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           override: true
+        if: env.GIT_DIFF
       - uses: actions-rs/cargo@v1
         with:
           command: test
         env:
           CARGO_INCREMENTAL: 0
           RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
+        if: env.GIT_DIFF
       - name: Pre-installing grcov
         uses: actions-rs/install@v0.1
         with:
           crate: grcov
           use-tool-cache: true
+        if: env.GIT_DIFF
       - name: Gather coverage data
         id: coverage
         uses: actions-rs/grcov@v0.1
+        if: env.GIT_DIFF
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
         with:
@@ -55,6 +73,7 @@ jobs:
           file: ${{ steps.coverage.outputs.report }}
           flags: unittests
           fail_ci_if_error: true
+        if: env.GIT_DIFF
   build-wasm:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -62,13 +81,24 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v2
+      # FIXME https://github.com/technote-space/get-diff-action/issues/151
+      # - uses: technote-space/get-diff-action@v4
+      #   with:
+      #     PATTERNS: |
+      #       **/*.rs
+      #       .github/**
+      #     FILES: |
+      #       Cargo.toml
+      #       Cargo.lock
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           target: wasm32-unknown-unknown
           override: true
+      #  if: env.GIT_DIFF
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: build
           args: --target wasm32-unknown-unknown
+      # if: env.GIT_DIFF
