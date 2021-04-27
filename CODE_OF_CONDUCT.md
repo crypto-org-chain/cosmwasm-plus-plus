@@ -26,7 +26,7 @@
 ## Moderation
 These are the policies for upholding our community’s standards of conduct. If you feel that a thread needs moderation, please contact the above mentioned person.
 
-1. Remarks that violate the Crypto.com Chain standards of conduct, including hateful, hurtful, oppressive, or exclusionary remarks, are not allowed. (Cursing is allowed, but never targeting another user, and never in a hateful manner.)
+1. Remarks that violate the Crypto.org Chain standards of conduct, including hateful, hurtful, oppressive, or exclusionary remarks, are not allowed. (Cursing is allowed, but never targeting another user, and never in a hateful manner.)
 
 2. Remarks that moderators find inappropriate, whether listed in the code of conduct or not, are also not allowed.
 
