@@ -1,0 +1,62 @@
+{
+    "chain-main": {
+        "branch": "master",
+        "description": "Crypto.org Chain⛓: Croeseid Testnet and beyond development",
+        "homepage": "https://crypto.org",
+        "owner": "crypto-org-chain",
+        "repo": "chain-main",
+        "rev": "9889a8af2204d8ca186616021704d3ddfc112f2b",
+        "sha256": "00csdjriyrspi9hcy8949d7j9bzzv6qkf5if6kns2nlnj66lbylg",
+        "type": "tarball",
+        "url": "https://github.com/crypto-org-chain/chain-main/archive/9889a8af2204d8ca186616021704d3ddfc112f2b.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "niv": {
+        "branch": "master",
+        "description": "Easy dependency management for Nix projects",
+        "homepage": "https://github.com/nmattia/niv",
+        "owner": "nmattia",
+        "repo": "niv",
+        "rev": "af958e8057f345ee1aca714c1247ef3ba1c15f5e",
+        "sha256": "1qjavxabbrsh73yck5dcq8jggvh3r2jkbr6b5nlz5d9yrqm9255n",
+        "type": "tarball",
+        "url": "https://github.com/nmattia/niv/archive/af958e8057f345ee1aca714c1247ef3ba1c15f5e.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixpkgs": {
+        "branch": "nixpkgs-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "f4c4ddae041241dc0c9d5628038826103958fdfc",
+        "sha256": "192bnsjrccvix9kd1cg895alghpdd73hdpis2s03b1p2rn1y2pkp",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/f4c4ddae041241dc0c9d5628038826103958fdfc.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "wasmd": {
+        "branch": "v0.16.0",
+        "description": "Basic cosmos-sdk app with web assembly smart contracts",
+        "homepage": null,
+        "owner": "CosmWasm",
+        "repo": "wasmd",
+        "rev": "5eb3ae79ca31548bcf1eba730e4bd0e7fa51010b",
+        "sha256": "0ymrgbjmy525c4cbwsqqv5d9d526z8gpgsq79phb36my6dphn38q",
+        "type": "tarball",
+        "url": "https://github.com/CosmWasm/wasmd/archive/5eb3ae79ca31548bcf1eba730e4bd0e7fa51010b.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "wasmvm": {
+        "branch": "v0.14.0",
+        "description": "Go bindings to the running cosmwasm contracts with wasmer ",
+        "homepage": null,
+        "owner": "CosmWasm",
+        "repo": "wasmvm",
+        "rev": "d40163d45f8f750bca50a07245118951e9f475bc",
+        "sha256": "057zjpbwwrn5ccbny2hgnaizrrgx9kn3rj3qs6xm9inki8n332w8",
+        "type": "tarball",
+        "url": "https://github.com/CosmWasm/wasmvm/archive/d40163d45f8f750bca50a07245118951e9f475bc.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}

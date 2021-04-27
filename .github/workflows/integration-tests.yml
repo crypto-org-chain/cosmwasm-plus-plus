@@ -1,0 +1,45 @@
+name: integration-tests
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - release/**
+    tags:
+      - '*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v12
+      - uses: cachix/cachix-action@v8
+        with:
+          name: crypto-com
+          signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+          # pull requests from forked repository can't access secrets anyway
+          # skipPush: ${{github.event_name == 'pull_request'}}
+      - uses: technote-space/get-diff-action@v4
+        with:
+          PATTERNS: |
+            **/*.rs
+            **/Cargo.toml
+            **/*.py
+            .github/**
+          FILES: |
+            Cargo.toml
+            Cargo.lock
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            target: wasm32-unknown-unknown
+            override: true
+        if: env.GIT_DIFF
+      - name: Run integration tests
+        run: |
+          RUSTFLAGS="-C link-arg=-s" cargo build --release --target=wasm32-unknown-unknown --locked
+          nix-shell --run "pytest integration_tests"
+        env:
+          RUSTFLAGS: "-C link-arg=-s"
+        if: env.GIT_DIFF

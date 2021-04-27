@@ -67,9 +67,9 @@ checksum = "9f6b64db6932c7e49332728e3a6bd82c6b7e16016607d20923b537c3bc4c0d5f"
 
 [[package]]
 name = "cosmwasm-crypto"
-version = "0.14.0-beta4"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1c01da6cef92b4cfeff1f0f9c25faea38933336c8f518923d3fa2d3802e999e"
+checksum = "3ddbf475b0e8a9bd813607d59144ad3f71d90dd66c5e975a46ac2b72ce754121"
 dependencies = [
  "digest",
  "ed25519-zebra",
@@ -80,18 +80,18 @@ dependencies = [
 
 [[package]]
 name = "cosmwasm-derive"
-version = "0.14.0-beta4"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a13cbe25d3df0636d4a1bad0880ea2dfd507740d0b851ed0bb39feee0352f4c"
+checksum = "d4e62de21147741486c6d4adc28850b102dcad1888d9fc2d0a200ca423284563"
 dependencies = [
  "syn",
 ]
 
 [[package]]
 name = "cosmwasm-schema"
-version = "0.14.0-beta3"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab1e8141c815e5847be08088090183a6a23bb29e0435054aa25cc9e36fbbfbde"
+checksum = "d6a9a6a4ca3b4d7b56f943312a65857cdfc84424f9c2773889f4cd17f36fba61"
 dependencies = [
  "schemars",
  "serde_json",
@@ -99,9 +99,9 @@ dependencies = [
 
 [[package]]
 name = "cosmwasm-std"
-version = "0.14.0-beta4"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcab389a0d8ea2a1399ad5416c1ca25cc860336ff7004a58128e487dcee8f109"
+checksum = "db14129579ddb1dbd8a28376673d61090f35c9069978eb875d489c275bb76315"
 dependencies = [
  "base64",
  "cosmwasm-crypto",
@@ -143,8 +143,8 @@ dependencies = [
 
 [[package]]
 name = "cw-storage-plus"
-version = "0.6.0-beta2"
-source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?rev=bf09c4d88673ac106c8e15e9c7c263b3c478843d#bf09c4d88673ac106c8e15e9c7c263b3c478843d"
+version = "0.6.0"
+source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?tag=v0.6.0#c40e26f5366b4276bdcfd3ed70ca15c332fde2fd"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -170,8 +170,8 @@ dependencies = [
 
 [[package]]
 name = "cw0"
-version = "0.6.0-beta2"
-source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?rev=bf09c4d88673ac106c8e15e9c7c263b3c478843d#bf09c4d88673ac106c8e15e9c7c263b3c478843d"
+version = "0.6.0"
+source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?tag=v0.6.0#c40e26f5366b4276bdcfd3ed70ca15c332fde2fd"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -181,8 +181,8 @@ dependencies = [
 
 [[package]]
 name = "cw2"
-version = "0.6.0-beta2"
-source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?rev=bf09c4d88673ac106c8e15e9c7c263b3c478843d#bf09c4d88673ac106c8e15e9c7c263b3c478843d"
+version = "0.6.0"
+source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?tag=v0.6.0#c40e26f5366b4276bdcfd3ed70ca15c332fde2fd"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
@@ -192,8 +192,8 @@ dependencies = [
 
 [[package]]
 name = "cw20"
-version = "0.6.0-beta2"
-source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?rev=bf09c4d88673ac106c8e15e9c7c263b3c478843d#bf09c4d88673ac106c8e15e9c7c263b3c478843d"
+version = "0.6.0"
+source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?tag=v0.6.0#c40e26f5366b4276bdcfd3ed70ca15c332fde2fd"
 dependencies = [
  "cosmwasm-std",
  "cw0",
@@ -641,5 +641,5 @@ checksum = "81a974bcdd357f0dca4d41677db03436324d45a4c9ed2d0b873a5a360ce41c36"
 
 [[patch.unused]]
 name = "cw20-base"
-version = "0.6.0-beta2"
-source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?rev=bf09c4d88673ac106c8e15e9c7c263b3c478843d#bf09c4d88673ac106c8e15e9c7c263b3c478843d"
+version = "0.6.0"
+source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?tag=v0.6.0#c40e26f5366b4276bdcfd3ed70ca15c332fde2fd"
