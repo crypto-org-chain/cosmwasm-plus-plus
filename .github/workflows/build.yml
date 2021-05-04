@@ -18,7 +18,6 @@ jobs:
         with:
           PATTERNS: |
             **/*.rs
-            **/Cargo.toml
             .github/**
           FILES: |
             Cargo.toml
@@ -33,6 +32,35 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features -- -D warnings
+        if: env.GIT_DIFF
+  schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: technote-space/get-diff-action@v4
+        with:
+          PATTERNS: |
+            **/*.rs
+            .github/**
+            */schema/**
+          FILES: |
+            Cargo.toml
+            Cargo.lock
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+        if: env.GIT_DIFF
+      - name: Check schema up to date
+        run: |
+          for pkg in $(find . -maxdepth 1 -type d -name "cw-*"); do
+           cd $pkg; cargo run --example schema --locked; cd ..;
+          done
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Repository is dirty. Showing 'git status' and 'git --no-pager diff' for debugging now:"
+            git status && git --no-pager diff
+            exit 1
+          fi
         if: env.GIT_DIFF
   test:
     runs-on: ubuntu-latest
