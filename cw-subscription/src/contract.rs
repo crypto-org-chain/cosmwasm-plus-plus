@@ -1,9 +1,7 @@
-use std::convert::TryInto;
-
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     has_coins, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Order,
-    Response, StdResult, Storage, Uint128, WasmMsg,
+    Response, StdResult, Storage, Timestamp, Uint128, WasmMsg,
 };
 use cw0::{Event, Expiration};
 use cw20::Cw20ExecuteMsg;
@@ -159,7 +157,8 @@ fn execute_subscribe(
     }
 
     // verify next_collection_time
-    if next_collection_time <= env.block.time.try_into().unwrap() {
+    let block_time = timestamp_secs(env.block.time);
+    if next_collection_time <= block_time {
         return Err(ContractError::InvalidCollectionTime);
     }
     let plan = PLANS.load(deps.storage, plan_id.u128().into())?;
@@ -170,7 +169,7 @@ fn execute_subscribe(
     // insert new subscription
     let sub = Subscription {
         expires,
-        last_collection_time: env.block.time.try_into().unwrap(),
+        last_collection_time: block_time,
         next_collection_time,
         deposit: info.funds,
     };
@@ -373,7 +372,7 @@ fn query_subscriptions(
 fn query_collectible_subscriptions(deps: Deps, env: Env, limit: Option<u32>) -> StdResult<Binary> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let items: Vec<_> =
-        iter_collectible_subscriptions(deps.storage, env.block.time.try_into().unwrap())
+        iter_collectible_subscriptions(deps.storage, timestamp_secs(env.block.time))
             .take(limit)
             .collect();
     let subscriptions = items
@@ -387,10 +386,16 @@ fn query_collectible_subscriptions(deps: Deps, env: Env, limit: Option<u32>) -> 
     to_binary(&SubscriptionsResponse { subscriptions })
 }
 
+/// get seconds of timestamp as i64
+/// no overflow here since nanos are represented with u64
+fn timestamp_secs(ts: Timestamp) -> i64 {
+    (ts.nanos() / 1_000_000_000u64) as i64
+}
+
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_binary, Addr, Coin};
+    use cosmwasm_std::{from_binary, Addr, Coin, Timestamp};
 
     use super::*;
 
@@ -537,7 +542,7 @@ mod tests {
             rsp,
             Subscription {
                 expires: Expiration::Never {},
-                last_collection_time: env.block.time.try_into().unwrap(),
+                last_collection_time: timestamp_secs(env.block.time),
                 next_collection_time: 1_571_797_440,
                 deposit: vec![],
             }
@@ -585,7 +590,7 @@ mod tests {
             .unwrap();
             assert_eq!(rsp.subscriptions.len(), 0);
 
-            env.block.time = 1_571_797_440;
+            env.block.time = Timestamp::from_seconds(1_571_797_440);
             let rsp: SubscriptionsResponse = from_binary(
                 &query(
                     deps.as_ref(),
@@ -753,7 +758,7 @@ mod tests {
                 mock_info(&user, &[]),
                 ExecuteMsg::Subscribe {
                     plan_id,
-                    expires: Expiration::AtTime(1_571_797_440),
+                    expires: Expiration::AtTime(Timestamp::from_seconds(1_571_797_440)),
                     next_collection_time: 1_571_797_420,
                 }
             ),
@@ -765,7 +770,7 @@ mod tests {
             mock_info(&user, &[Coin::new(1000u128.into(), native_token.clone())]),
             ExecuteMsg::Subscribe {
                 plan_id,
-                expires: Expiration::AtTime(1_571_797_440),
+                expires: Expiration::AtTime(Timestamp::from_seconds(1_571_797_440)),
                 next_collection_time: 1_571_797_440,
             },
         )

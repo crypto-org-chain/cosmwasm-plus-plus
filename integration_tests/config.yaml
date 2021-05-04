@@ -1,0 +1,18 @@
+chainmaind:
+  cmd: wasmd
+  validators:
+    - coins: 1000000000ucosm,1000000000ustake
+      staked: 1000000000ustake
+    - coins: 1000000000ucosm,1000000000ustake
+      staked: 1000000000ustake
+  accounts:
+    - name: community
+      coins: 1000000000ucosm
+    - name: ecosystem
+      coins: 1000000000ucosm
+  genesis:
+    app_state:
+      staking:
+        params:
+          unbonding_time: "10s"
+          bond_denom: ustake

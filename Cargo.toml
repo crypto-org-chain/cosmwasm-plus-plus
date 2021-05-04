@@ -14,8 +14,8 @@ debug = false
 debug-assertions = false
 
 [patch.crates-io]
-cw0 = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", rev = "bf09c4d88673ac106c8e15e9c7c263b3c478843d" }
-cw2 = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", rev = "bf09c4d88673ac106c8e15e9c7c263b3c478843d" }
-cw20 = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", rev = "bf09c4d88673ac106c8e15e9c7c263b3c478843d" }
-cw-storage-plus = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", rev = "bf09c4d88673ac106c8e15e9c7c263b3c478843d" }
-cw20-base = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", rev = "bf09c4d88673ac106c8e15e9c7c263b3c478843d" }
+cw0 = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", tag = "v0.6.0" }
+cw2 = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", tag = "v0.6.0" }
+cw20 = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", tag = "v0.6.0" }
+cw-storage-plus = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", tag = "v0.6.0" }
+cw20-base = { git = "https://github.com/CosmWasm/cosmwasm-plus.git", tag = "v0.6.0" }
