@@ -58,6 +58,7 @@ pub struct InitMsg {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// create plan, sender will be the plan owner
     CreatePlan(PlanContent<String>),
@@ -83,7 +84,7 @@ pub enum ExecuteMsg {
         expires: Expiration,
     },
     /// Trigger collection of a batch of subscriptions
-    Collection { items: Vec<CollectOne> },
+    Collect { items: Vec<CollectOne> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

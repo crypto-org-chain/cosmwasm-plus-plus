@@ -6,10 +6,10 @@
       "description": "create plan, sender will be the plan owner",
       "type": "object",
       "required": [
-        "CreatePlan"
+        "create_plan"
       ],
       "properties": {
-        "CreatePlan": {
+        "create_plan": {
           "$ref": "#/definitions/PlanContent_for_String"
         }
       },
@@ -19,10 +19,10 @@
       "description": "stop plan, sender must be the plan owner",
       "type": "object",
       "required": [
-        "StopPlan"
+        "stop_plan"
       ],
       "properties": {
-        "StopPlan": {
+        "stop_plan": {
           "type": "object",
           "required": [
             "plan_id"
@@ -40,10 +40,10 @@
       "description": "sender subscribe to some plan If expiration is set, update if subscription exists",
       "type": "object",
       "required": [
-        "Subscribe"
+        "subscribe"
       ],
       "properties": {
-        "Subscribe": {
+        "subscribe": {
           "type": "object",
           "required": [
             "expires",
@@ -70,10 +70,10 @@
       "description": "sender unsubscribe to some plan",
       "type": "object",
       "required": [
-        "Unsubscribe"
+        "unsubscribe"
       ],
       "properties": {
-        "Unsubscribe": {
+        "unsubscribe": {
           "type": "object",
           "required": [
             "plan_id"
@@ -91,10 +91,10 @@
       "description": "Stop subscription on user's behalf, sender must be the plan owner",
       "type": "object",
       "required": [
-        "UnsubscribeUser"
+        "unsubscribe_user"
       ],
       "properties": {
-        "UnsubscribeUser": {
+        "unsubscribe_user": {
           "type": "object",
           "required": [
             "plan_id",
@@ -116,10 +116,10 @@
       "description": "Update expires of subscription",
       "type": "object",
       "required": [
-        "UpdateExpires"
+        "update_expires"
       ],
       "properties": {
-        "UpdateExpires": {
+        "update_expires": {
           "type": "object",
           "required": [
             "expires",
@@ -141,10 +141,10 @@
       "description": "Trigger collection of a batch of subscriptions",
       "type": "object",
       "required": [
-        "Collection"
+        "collect"
       ],
       "properties": {
-        "Collection": {
+        "collect": {
           "type": "object",
           "required": [
             "items"

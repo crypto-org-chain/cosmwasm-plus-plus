@@ -6,6 +6,7 @@ authors = ["huangyi <huang@crypto.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
+python-dateutil = "^2.8.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.3"
