@@ -638,8 +638,3 @@ name = "zeroize"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81a974bcdd357f0dca4d41677db03436324d45a4c9ed2d0b873a5a360ce41c36"
-
-[[patch.unused]]
-name = "cw20-base"
-version = "0.6.0"
-source = "git+https://github.com/CosmWasm/cosmwasm-plus.git?tag=v0.6.0#c40e26f5366b4276bdcfd3ed70ca15c332fde2fd"

@@ -4,6 +4,8 @@ import socket
 import subprocess
 import time
 
+from dateutil.parser import isoparse
+
 
 def interact(cmd, ignore_error=False, input=None, **kwargs):
     proc = subprocess.Popen(
@@ -83,19 +85,135 @@ class Command:
             kwargs.setdefault("chain_id", self.chain_id)
         if cmd in ("tx", "keys"):
             kwargs.setdefault("keyring_backend", "test")
+        if cmd in ("query",):
+            kwargs.setdefault("output", "json")
         args = " ".join(build_cli_args_safe(cmd, *args, **kwargs))
         return interact(f"{self.cmd} {args}", input=stdin)
 
     def wait_for_block(self, n, timeout=10):
         print("wait for block", n)
         for i in range(timeout):
-            height = int(json.loads(self("status"))["SyncInfo"]["latest_block_height"])
+            height = int(self.status()["SyncInfo"]["latest_block_height"])
             print("current block", height)
             if height >= n:
                 break
             time.sleep(1)
         else:
             raise TimeoutError(f"wait for block {n}")
+
+    def wait_for_new_blocks(self, n):
+        begin_height = int((self.status())["SyncInfo"]["latest_block_height"])
+        while True:
+            time.sleep(0.5)
+            cur_height = int((self.status())["SyncInfo"]["latest_block_height"])
+            if cur_height - begin_height >= n:
+                break
+
+    def wait_for_block_time(self, t):
+        print("wait for block time", t)
+        while True:
+            now = isoparse(json.loads(self("status"))["SyncInfo"]["latest_block_time"])
+            print("block time now:", now)
+            if now >= t:
+                break
+            time.sleep(0.5)
+
+    def status(self):
+        return json.loads(self("status"))
+
+    def address(self, name):
+        return self("keys", "show", name, "-a").strip().decode()
+
+    def balances(self, address):
+        return {
+            balance["denom"]: int(balance["amount"])
+            for balance in json.loads(self("query", "bank", "balances", address))[
+                "balances"
+            ]
+        }
+
+    def store(self, path, from_, gas=2000000):
+        rsp = Response(
+            json.loads(
+                self(
+                    "tx",
+                    "wasm",
+                    "store",
+                    path,
+                    "-y",
+                    from_=from_,
+                    gas=2000000,
+                )
+            )
+        )
+        assert rsp.code == 0, rsp["raw_log"]
+        return int(rsp.events[0]["code_id"])
+
+    def instantiate(self, code_id, init_msg, from_, label="test contract", admin=None):
+        rsp = Response(
+            json.loads(
+                self(
+                    "tx",
+                    "wasm",
+                    "instantiate",
+                    code_id,
+                    json.dumps(init_msg),
+                    "-y",
+                    label=label,
+                    admin=admin or from_,
+                    from_=from_,
+                )
+            )
+        )
+        assert rsp.code == 0, rsp["raw_log"]
+        return rsp.events[0]["contract_address"]
+
+    def construct(self, path, init_msg, from_, label="test contract", admin=None):
+        """
+        store + instantiate
+        """
+        code_id = self.store(path, from_)
+        return self.instantiate(code_id, init_msg, from_, label=label, admin=admin)
+
+    def execute(self, contract, msg, from_, amount=0):
+        rsp = Response(
+            json.loads(
+                self(
+                    "tx",
+                    "wasm",
+                    "execute",
+                    contract,
+                    json.dumps(msg),
+                    "-y",
+                    from_=from_,
+                    amount=f"{amount}ucosm",
+                )
+            )
+        )
+        assert rsp.code == 0, rsp["raw_log"]
+        return rsp.events
+
+    def query(self, contract, msg):
+        return json.loads(
+            self(
+                "query",
+                "wasm",
+                "contract-state",
+                "smart",
+                contract,
+                json.dumps(msg),
+            )
+        )["data"]
+
+
+class Response(dict):
+    @property
+    def events(self):
+        return parse_events(self)
+
+    @property
+    def code(self):
+        return self.get("code", 0)
 
 
 def wait_for_port(port, host="127.0.0.1", timeout=40.0):
@@ -111,3 +229,10 @@ def wait_for_port(port, host="127.0.0.1", timeout=40.0):
                     "Waited too long for the port {} on host {} to start accepting "
                     "connections.".format(port, host)
                 ) from ex
+
+
+def parse_events(rsp):
+    return [
+        {attr["key"]: attr["value"] for attr in evt["attributes"]}
+        for evt in json.loads(rsp["raw_log"])[0]["events"]
+    ]

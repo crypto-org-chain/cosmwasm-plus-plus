@@ -56,7 +56,7 @@ pub fn execute(
         ExecuteMsg::UpdateExpires { plan_id, expires } => {
             execute_update_expires(deps, env, info, plan_id, expires)
         }
-        ExecuteMsg::Collection { items } => execute_collection(deps, items),
+        ExecuteMsg::Collect { items } => execute_collection(deps, items),
     }
 }
 
@@ -87,6 +87,7 @@ fn execute_create_plan(
     Ok(rsp)
 }
 
+#[allow(clippy::needless_collect)]
 fn execute_stop_plan(
     deps: DepsMut,
     info: MessageInfo,
@@ -99,7 +100,7 @@ fn execute_stop_plan(
 
     let mut rsp = Response::default();
 
-    // Stop all subscriptions
+    // Stop all subscriptions, collect is needed for lifetime issue
     let subscriptions: Vec<_> = iter_subscriptions_by_plan(deps.storage, plan_id, None).collect();
     for (subscriber, sub) in subscriptions.into_iter() {
         UnsubscribeEvent {
@@ -371,12 +372,9 @@ fn query_subscriptions(
 
 fn query_collectible_subscriptions(deps: Deps, env: Env, limit: Option<u32>) -> StdResult<Binary> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let items: Vec<_> =
-        iter_collectible_subscriptions(deps.storage, timestamp_secs(env.block.time))
-            .take(limit)
-            .collect();
+    let items =
+        iter_collectible_subscriptions(deps.storage, timestamp_secs(env.block.time)).take(limit);
     let subscriptions = items
-        .into_iter()
         .map(|(_, plan_id, subscriber)| {
             SUBSCRIPTIONS
                 .load(deps.storage, (plan_id.u128().into(), subscriber.as_str()))
@@ -611,7 +609,7 @@ mod tests {
                     deps.as_mut(),
                     env.clone(),
                     mock_info(&user, &[]),
-                    ExecuteMsg::Collection {
+                    ExecuteMsg::Collect {
                         items: vec![CollectOne {
                             plan_id,
                             subscriber: subscriber.clone().into(),
@@ -630,7 +628,7 @@ mod tests {
                     deps.as_mut(),
                     env.clone(),
                     mock_info(&user, &[]),
-                    ExecuteMsg::Collection {
+                    ExecuteMsg::Collect {
                         items: vec![CollectOne {
                             plan_id,
                             subscriber: subscriber.clone().into(),
@@ -650,7 +648,7 @@ mod tests {
                 deps.as_mut(),
                 env.clone(),
                 mock_info(&user, &[]),
-                ExecuteMsg::Collection {
+                ExecuteMsg::Collect {
                     items: vec![CollectOne {
                         plan_id,
                         subscriber: subscriber.into(),
